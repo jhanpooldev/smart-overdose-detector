@@ -71,3 +71,34 @@ async def get_history(patient_id: str, limit: int = Query(50, ge=1, le=200)):
         }
         for r in readings
     ]
+
+
+@router.get("/db-status", tags=["Health"])
+async def db_status():
+    """
+    Verifica el tipo de repositorio activo y la conexión a la BD.
+    Útil para confirmar que PostgreSQL está conectado correctamente.
+    """
+    from src.infrastructure.configuration.container import signal_repository
+    from src.infrastructure.configuration.settings import settings
+
+    repo_type = type(signal_repository).__name__
+
+    if hasattr(signal_repository, "test_connection"):
+        try:
+            info = signal_repository.test_connection()
+            return {
+                "storage_backend": settings.STORAGE_BACKEND,
+                "repository": repo_type,
+                "status": "connected",
+                "db_version": info.get("db_version", ""),
+            }
+        except Exception as e:
+            return {"storage_backend": settings.STORAGE_BACKEND, "repository": repo_type, "status": "error", "detail": str(e)}
+
+    return {
+        "storage_backend": settings.STORAGE_BACKEND,
+        "repository": repo_type,
+        "status": "in-memory (no DB connection)",
+        "note": "Cambia STORAGE_BACKEND=postgres en .env para usar PostgreSQL",
+    }
