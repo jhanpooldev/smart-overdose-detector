@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL + TimescaleDB
+  # ─────────────────────────────────────────────
+  db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: sod_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: overdose_detector
+      POSTGRES_USER: sod_user
+      POSTGRES_PASSWORD: sod_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sod_user -d overdose_detector"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # FastAPI Backend
+  # ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sod_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://sod_user:sod_secret@db:5432/overdose_detector
+      ENV: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:
