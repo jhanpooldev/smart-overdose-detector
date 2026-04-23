@@ -1,5 +1,4 @@
 // lib/presentation/screens/historial_screen.dart
-// Pantalla de historial clínico — lecturas biométricas pasadas.
 
 import 'package:flutter/material.dart';
 
@@ -8,7 +7,6 @@ class HistorialScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // En PMV2, esta lista se poblará desde el HttpClientAdapter → backend /api/v1/history
     final mockHistory = List.generate(15, (i) {
       final spo2 = 85.0 + (i * 0.8);
       final bpm = 55 + i * 2;
@@ -34,65 +32,86 @@ class HistorialScreen extends StatelessWidget {
                 (context, index) {
                   final item = mockHistory[index];
                   final isRisk = item['isRisk'] as bool;
+
                   final accentColor = isRisk
                       ? const Color(0xFFF59E0B)
                       : const Color(0xFF10B981);
 
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131929),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF131929),
+                          const Color(0xFF0F1424),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: accentColor.withOpacity(0.2),
+                        color: accentColor.withOpacity(0.25),
                         width: 1,
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: accentColor,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['time'] as String,
-                                style: const TextStyle(
-                                  color: Color(0xFF9CA3AF),
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  _pill('SpO₂ ${item['spo2']}%', const Color(0xFF60A5FA)),
-                                  const SizedBox(width: 8),
-                                  _pill('${item['bpm']} BPM', const Color(0xFFEC4899)),
-                                  const SizedBox(width: 8),
-                                  _pill(
-                                    item['activity'] == 1 ? 'Activo' : 'Reposo',
-                                    const Color(0xFF10B981),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          isRisk ? Icons.warning_rounded : Icons.check_circle_rounded,
-                          color: accentColor,
-                          size: 20,
-                        ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
                       ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: accentColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['time'] as String,
+                                  style: const TextStyle(
+                                    color: Color(0xFF9CA3AF),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    _pill('SpO₂ ${item['spo2']}%', const Color(0xFF60A5FA)),
+                                    const SizedBox(width: 8),
+                                    _pill('${item['bpm']} BPM', const Color(0xFFEC4899)),
+                                    const SizedBox(width: 8),
+                                    _pill(
+                                      item['activity'] == 1 ? 'Activo' : 'Reposo',
+                                      const Color(0xFF10B981),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          Icon(
+                            isRisk
+                                ? Icons.warning_rounded
+                                : Icons.check_circle_rounded,
+                            color: accentColor,
+                            size: 22,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -107,14 +126,18 @@ class HistorialScreen extends StatelessWidget {
 
   Widget _pill(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
