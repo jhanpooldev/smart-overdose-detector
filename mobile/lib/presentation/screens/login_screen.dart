@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const HomeShell()),
       );
     } else if (mounted) {
-      setState(() => _error = 'Email o contraseña incorrectos');
+      setState(() => _error = 'Email o contraseña incorrectos, volver a intenralo');
     }
   }
 
