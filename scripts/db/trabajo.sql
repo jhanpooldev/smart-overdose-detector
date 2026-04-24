@@ -1,11 +1,7 @@
 -- =============================================================================
--- trabajo.sql — Base de datos Smart Overdose Detector (Adaptado al diseño final)
+-- trabajo.sql — Base de datos Smart Overdose Detector (Adaptado al diseño final con Auth)
 -- =============================================================================
 
--- Si tienes TimescaleDB instalado, descomenta esta línea:
--- CREATE EXTENSION IF NOT EXISTS timescaledb;
-
--- Limpiamos si ya existen
 DROP TABLE IF EXISTS risk_events CASCADE;
 DROP TABLE IF EXISTS biometric_signals CASCADE;
 DROP TABLE IF EXISTS biometric_signals_simple CASCADE;
@@ -13,12 +9,25 @@ DROP TABLE IF EXISTS devices CASCADE;
 DROP TABLE IF EXISTS patient_contacts CASCADE;
 DROP TABLE IF EXISTS emergency_contacts CASCADE;
 DROP TABLE IF EXISTS patients CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- =============================================================================
+-- 0. TABLA: users (Autenticación y Roles)
+-- =============================================================================
+CREATE TABLE users (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           VARCHAR(100) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    role            VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'DOCTOR', 'PATIENT', 'FAMILY')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- =============================================================================
 -- 1. TABLA: patients
 -- =============================================================================
 CREATE TABLE patients (
     patient_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID UNIQUE REFERENCES users(id) ON DELETE SET NULL,
     dni             VARCHAR(20)  UNIQUE NOT NULL,
     nombre          VARCHAR(100) NOT NULL,
     apellido        VARCHAR(100) NOT NULL,
@@ -32,6 +41,7 @@ CREATE TABLE patients (
 -- =============================================================================
 CREATE TABLE emergency_contacts (
     contact_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID UNIQUE REFERENCES users(id) ON DELETE SET NULL,
     nombre      VARCHAR(100) NOT NULL,
     telefono    VARCHAR(20)  NOT NULL,
     relacion    VARCHAR(50)  NOT NULL,
@@ -90,30 +100,48 @@ CREATE TABLE risk_events (
 );
 
 -- =============================================================================
--- 7. DATOS DE EJEMPLO DE TU ARCHIVO ORIGINAL
+-- 7. DATOS DE EJEMPLO DE PRUEBA (Auth + Roles)
+-- hash para '123456' -> $2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi
 -- =============================================================================
 
--- Paciente: Juan Perez (Edad calculada en base a 1950)
-INSERT INTO patients (patient_id, dni, nombre, apellido, edad, telefono)
-VALUES ('00000000-0000-0000-0000-000000000001', '12345678', 'Juan', 'Perez', 76, '+51987654320');
+-- CREAR USUARIOS
+-- ADMIN
+INSERT INTO users (id, email, hashed_password, role)
+VALUES ('00000000-0000-0000-0000-100000000000', 'admin@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'ADMIN');
 
--- Contacto: Maria Perez
-INSERT INTO emergency_contacts (contact_id, nombre, telefono, relacion, es_principal)
-VALUES ('00000000-0000-0000-0000-000000000002', 'Maria Perez', '987654321', 'Hija', TRUE);
+-- DOCTOR
+INSERT INTO users (id, email, hashed_password, role)
+VALUES ('00000000-0000-0000-0000-100000000001', 'doctor@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'DOCTOR');
 
--- Vincular contacto
+-- PACIENTE
+INSERT INTO users (id, email, hashed_password, role)
+VALUES ('00000000-0000-0000-0000-100000000002', 'paciente@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'PATIENT');
+
+-- FAMILIAR
+INSERT INTO users (id, email, hashed_password, role)
+VALUES ('00000000-0000-0000-0000-100000000003', 'familiar@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'FAMILY');
+
+
+-- CREAR PERFILES VINCULADOS A LOS USUARIOS
+-- Paciente: Juan Perez as paciente@sod.com
+INSERT INTO patients (patient_id, user_id, dni, nombre, apellido, edad, telefono)
+VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-100000000002', '12345678', 'Juan', 'Perez', 76, '+51987654320');
+
+-- Contacto: Maria Perez as familiar@sod.com
+INSERT INTO emergency_contacts (contact_id, user_id, nombre, telefono, relacion, es_principal)
+VALUES ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-100000000003', 'Maria Perez', '987654321', 'Hija', TRUE);
+
+-- Vincular
 INSERT INTO patient_contacts (patient_id, contact_id)
 VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002');
 
--- Dispositivo: Smartwatch Samsung
+-- Device
 INSERT INTO devices (device_id, patient_id, device_type, device_name, is_active)
 VALUES ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'wearable', 'Smartwatch Samsung', TRUE);
 
--- Simular la misma lectura que tenías: FC=75, SpO2=98.0
--- (Usamos 'PAT-001' como patient_id porque es el que usa el simulador en el código PMV1 por defecto)
+-- Simulaciones históricas ('PAT-001' se mapea conceptualmente en el backend al usuario PATIENT en memoria)
 INSERT INTO biometric_signals_simple (signal_time, patient_id, spo2, bpm, activity, source)
 VALUES ('2026-04-21 23:05:32.904531', 'PAT-001', 98.00, 75, 1, 'wearable');
 
--- Evento de riesgo
 INSERT INTO risk_events (patient_id, risk_level, probability, spo2_at_event, bpm_at_event, activity_at_event, detected_at)
 VALUES ('PAT-001', 'CRITICAL', 0.9250, 98.00, 75, 1, '2026-04-21 23:05:32.904531');

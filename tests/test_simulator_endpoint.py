@@ -6,7 +6,20 @@ Usa TestClient de FastAPI para verificar la respuesta sin servidor real.
 import pytest
 from fastapi.testclient import TestClient
 from src.main import app
+from src.infrastructure.adapters.input.controllers.auth_controller import get_current_user
+from src.domain.entities.user import User, Role
+from datetime import datetime
 
+def override_get_current_user():
+    return User(
+        id="test-id",
+        email="test@sod.com",
+        role=Role.DOCTOR,
+        hashed_password="hash",
+        created_at=datetime.now()
+    )
+
+app.dependency_overrides[get_current_user] = override_get_current_user
 client = TestClient(app)
 
 

@@ -25,7 +25,11 @@ else:
     from src.infrastructure.adapters.output.persistence.in_memory_signal_repository import (
         InMemorySignalRepository,
     )
+    from src.infrastructure.adapters.output.persistence.in_memory_user_repository import (
+        InMemoryUserRepository,
+    )
     signal_repository = InMemorySignalRepository()
+    user_repository = InMemoryUserRepository()
     logging.getLogger(__name__).info("🗄️  Repositorio: Memoria RAM (sin BD persistente)")
 
 # 2. Resto de adaptadores
@@ -35,10 +39,12 @@ from src.infrastructure.adapters.input.simulators.simulated_data_generator impor
 from src.application.services.calculadora_riesgo_service import CalculadoraRiesgoService
 from src.application.useCases.evaluar_riesgo_use_case import EvaluarRiesgoUseCase
 from src.application.useCases.gestionar_alerta_use_case import GestionarAlertaUseCase
+from src.application.services.auth_service import AuthService
 
 alert_service = StubAlertService()
 anomaly_detector = RuleBasedAnomalyDetector()
 simulated_data_generator = SimulatedDataGenerator()
+auth_service = AuthService()
 
 # --- Servicios de dominio ---
 calculadora_riesgo = CalculadoraRiesgoService(anomaly_detection_port=anomaly_detector)

@@ -8,3 +8,7 @@ pytest-asyncio>=0.21.0
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.9
 python-dotenv>=1.0.0
+# Autenticación y Seguridad
+pyjwt>=2.8.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6

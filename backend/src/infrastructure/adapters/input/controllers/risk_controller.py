@@ -11,6 +11,9 @@ from src.infrastructure.configuration.container import (
     gestionar_alerta_use_case,
 )
 from src.domain.entities.risk_event import RiskLevel
+from src.infrastructure.adapters.input.controllers.auth_controller import get_current_user
+from src.domain.entities.user import User
+from fastapi import APIRouter, Query, Depends, HTTPException
 
 router = APIRouter(prefix="/api/v1", tags=["Risk Detection"])
 
@@ -31,9 +34,11 @@ class RiskEvaluationResponse(BaseModel):
 async def evaluate_risk(
     patient_id: str = Query("PAT-001", description="ID del paciente"),
     scenario: str = Query("normal", description="Escenario: normal | moderate | critical"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Genera una lectura simulada y la evalúa con el motor de riesgo completo.
+    (Operativo para todos los usuarios autenticados para demostración PMV1).
     Extiende el endpoint /simulate/reading añadiendo clasificación de IA.
     """
     reading = simulated_data_generator.generate_reading(patient_id, scenario)  # type: ignore
@@ -58,7 +63,11 @@ async def evaluate_risk(
 
 
 @router.get("/history/{patient_id}")
-async def get_history(patient_id: str, limit: int = Query(50, ge=1, le=200)):
+async def get_history(
+    patient_id: str, 
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user)
+):
     """Retorna el historial de lecturas biométricas de un paciente."""
     from src.infrastructure.configuration.container import signal_repository
     readings = signal_repository.get_history(patient_id, limit)
