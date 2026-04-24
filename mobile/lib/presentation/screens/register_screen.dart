@@ -1,0 +1,180 @@
+// lib/presentation/screens/register_screen.dart
+// Pantalla "Crear Cuenta" basada en el mockup del usuario
+import 'package:flutter/material.dart';
+import 'login_screen.dart';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  int _edad = 30;
+  int _peso = 75;
+  String _sexo = 'Masculino';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0F4F8),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF2563EB)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Crear Cuenta',
+            style: TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+        child: Column(
+          children: [
+            const Text(
+              'Ingresa tus datos para comenzar\nel monitoreo de salud',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF4B5563), fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+
+            // Form card
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+              ),
+              child: Column(
+                children: [
+                  _textField(icon: Icons.person_outline, hint: 'Nombre completo', controller: _nameCtrl),
+                  const Divider(height: 1),
+                  _textField(icon: Icons.email_outlined, hint: 'Correo electrónico', controller: _emailCtrl),
+                  const Divider(height: 1),
+                  _textField(icon: Icons.lock_outline, hint: 'Contraseña', controller: _passCtrl, obscure: true),
+                  const Divider(height: 1),
+                  _textField(icon: Icons.lock_outline, hint: 'Confirmar contraseña', controller: _confirmCtrl, obscure: true),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Edad, peso, sexo
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+              ),
+              child: Column(
+                children: [
+                  _stepperRow('Edad', '$_edad', () => setState(() => _edad = (_edad - 1).clamp(18, 120)), () => setState(() => _edad = (_edad + 1).clamp(18, 120))),
+                  const Divider(height: 1),
+                  _stepperRow('Peso', '${_peso}kg', () => setState(() => _peso = (_peso - 1).clamp(30, 200)), () => setState(() => _peso = (_peso + 1).clamp(30, 200))),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.wc_outlined, color: Color(0xFF9CA3AF), size: 20),
+                        const SizedBox(width: 12),
+                        const Text('Sexo', style: TextStyle(color: Color(0xFF4B5563))),
+                        const Spacer(),
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _sexo,
+                            items: ['Masculino', 'Femenino', 'Otro'].map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 14)))).toList(),
+                            onChanged: (v) => setState(() => _sexo = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+                child: const Text('Crear Cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('¿Ya tienes una cuenta?', style: TextStyle(color: Color(0xFF4B5563), fontSize: 13)),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Iniciar sesión', style: TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _textField({required IconData icon, required String hint, required TextEditingController controller, bool obscure = false}) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: const TextStyle(color: Color(0xFF111827), fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+        prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _stepperRow(String label, String value, VoidCallback dec, VoidCallback inc) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Text(label, style: const TextStyle(color: Color(0xFF4B5563), fontSize: 14)),
+          const Spacer(),
+          _stepBtn(Icons.remove, dec),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+          _stepBtn(Icons.add, inc),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 28, height: 28,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2563EB),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, color: Colors.white, size: 16),
+      ),
+    );
+  }
+}

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'presentation/screens/dashboard_screen.dart';
+import 'presentation/screens/login_screen.dart';
 
 void main() {
   runApp(const SmartOverdoseDetectorApp());
@@ -15,18 +15,44 @@ class SmartOverdoseDetectorApp extends StatelessWidget {
       title: 'Smart Overdose Detector',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0E1A),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF60A5FA),
-          secondary: const Color(0xFF10B981),
-          error: const Color(0xFFEF4444),
-          surface: const Color(0xFF131929),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF0F4F8),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF2563EB),
+          secondary: Color(0xFF10B981),
+          error: Color(0xFFDC2626),
+          surface: Colors.white,
         ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-        useMaterial3: true,
+        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1D4ED8),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: Color(0xFF2563EB),
+          unselectedItemColor: Color(0xFF9CA3AF),
+          type: BottomNavigationBarType.fixed,
+          elevation: 8,
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2563EB),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+        useMaterial3: false,
       ),
-      home: const DashboardScreen(),
+      home: const LoginScreen(),
     );
   }
 }

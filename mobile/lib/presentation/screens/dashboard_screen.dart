@@ -11,6 +11,9 @@ import '../widgets/vitals_card.dart';
 import '../widgets/risk_level_chip.dart';
 import 'historial_screen.dart';
 import 'configuracion_screen.dart';
+import 'login_screen.dart';
+import '../../domain/entities/user.dart';
+import '../../infrastructure/auth/auth_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -99,13 +102,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   AppBar _buildAppBar() {
+    final user = AuthService().currentUser;
+    final isDoctor = user?.role == Role.doctor;
+    final roleLabel = user?.role.name.toUpperCase() ?? 'PACIENTE';
+    
     return AppBar(
       backgroundColor: const Color(0xFF0D1220),
       elevation: 0,
       centerTitle: true,
-      title: const Column(
+      title: Column(
         children: [
-          Text(
+          const Text(
             'Smart Overdose Detector',
             style: TextStyle(
               fontSize: 16,
@@ -115,22 +122,32 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
           Text(
-            'Monitoreo Biométrico — PMV1',
-            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            'Monitoreo — Perfil: \$roleLabel',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
           ),
         ],
       ),
       actions: [
-        PopupMenuButton<ScenarioType>(
-          icon: const Icon(Icons.tune, color: Color(0xFF60A5FA)),
-          tooltip: 'Cambiar escenario',
-          color: const Color(0xFF1A2035),
-          onSelected: (s) => setState(() => _sensorAdapter.setScenario(s)),
-          itemBuilder: (_) => [
-            _scenarioItem(ScenarioType.normal, '🟢 Normal', const Color(0xFF10B981)),
-            _scenarioItem(ScenarioType.moderate, '🟡 Moderado', const Color(0xFFF59E0B)),
-            _scenarioItem(ScenarioType.critical, '🔴 Crítico', const Color(0xFFEF4444)),
-          ],
+        if (isDoctor)
+          PopupMenuButton<ScenarioType>(
+            icon: const Icon(Icons.tune, color: Color(0xFF60A5FA)),
+            tooltip: 'Cambiar escenario',
+            color: const Color(0xFF1A2035),
+            onSelected: (s) => setState(() => _sensorAdapter.setScenario(s)),
+            itemBuilder: (_) => [
+              _scenarioItem(ScenarioType.normal, '🟢 Normal', const Color(0xFF10B981)),
+              _scenarioItem(ScenarioType.moderate, '🟡 Moderado', const Color(0xFFF59E0B)),
+              _scenarioItem(ScenarioType.critical, '🔴 Crítico', const Color(0xFFEF4444)),
+            ],
+          ),
+        IconButton(
+          icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
+          onPressed: () {
+            AuthService().logout();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          },
         ),
       ],
     );
