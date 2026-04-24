@@ -8,8 +8,8 @@ from datetime import datetime
 
 class InMemoryUserRepository(IUserRepository):
     def __init__(self):
-        # Hash fijo para "123456" generado por bcrypt
-        hash_123456 = "$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi"
+        # Hash fijo para "123456" generado por sha256
+        hash_123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
         self._users = {
             "doctor@sod.com": User(
                 id="00000000-0000-0000-0000-100000000001",

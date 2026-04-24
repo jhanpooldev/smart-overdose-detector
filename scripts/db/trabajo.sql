@@ -107,15 +107,15 @@ CREATE TABLE risk_events (
 -- CREAR USUARIOS
 -- ADMIN
 INSERT INTO users (id, email, hashed_password, role)
-VALUES ('00000000-0000-0000-0000-100000000000', 'admin@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'ADMIN');
+VALUES ('00000000-0000-0000-0000-100000000000', 'admin@sod.com', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'ADMIN');
 
 -- DOCTOR
 INSERT INTO users (id, email, hashed_password, role)
-VALUES ('00000000-0000-0000-0000-100000000001', 'doctor@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'DOCTOR');
+VALUES ('00000000-0000-0000-0000-100000000001', 'doctor@sod.com', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'DOCTOR');
 
 -- PACIENTE
 INSERT INTO users (id, email, hashed_password, role)
-VALUES ('00000000-0000-0000-0000-100000000002', 'paciente@sod.com', '$2b$12$/O.bM4rDq6L1S0J4K6M/i.Q2k8y1J3M./gWqj/Sqz6qU2O9f6/kYi', 'PATIENT');
+VALUES ('00000000-0000-0000-0000-100000000002', 'paciente@sod.com', '$2b$12$fzSu4sp/LtDoBD4LCG18su9AxSf84.m575tfeMS2j22ZES1bj4q8wq', 'PATIENT');
 
 -- FAMILIAR
 INSERT INTO users (id, email, hashed_password, role)

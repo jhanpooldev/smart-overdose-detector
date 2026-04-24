@@ -3,21 +3,18 @@ auth_service.py — Lógica de generación y validación de tokens JWT.
 """
 from datetime import datetime, timedelta
 import jwt
-from passlib.context import CryptContext
+import hashlib
 
 SECRET_KEY = "super-secret-key-for-sod-pmv"  # En PMV2 mover a .env
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 semana (para desarrollo)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 class AuthService:
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        return self.get_password_hash(plain_password) == hashed_password
 
     def get_password_hash(self, password: str) -> str:
-        return pwd_context.hash(password)
+        return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
     def create_access_token(self, data: dict, expires_delta: timedelta | None = None) -> str:
         to_encode = data.copy()
