@@ -28,8 +28,16 @@ else:
     from src.infrastructure.adapters.output.persistence.in_memory_user_repository import (
         InMemoryUserRepository,
     )
+    from src.infrastructure.adapters.output.persistence.in_memory_contact_repository import (
+        InMemoryContactRepository,
+    )
+    from src.infrastructure.adapters.output.persistence.in_memory_settings_repository import (
+        InMemorySettingsRepository,
+    )
     signal_repository = InMemorySignalRepository()
     user_repository = InMemoryUserRepository()
+    contact_repository = InMemoryContactRepository()
+    settings_repository = InMemorySettingsRepository()
     logging.getLogger(__name__).info("🗄️  Repositorio: Memoria RAM (sin BD persistente)")
 
 # 2. Resto de adaptadores

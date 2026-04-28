@@ -6,7 +6,7 @@ import '../../domain/entities/user.dart';
 import 'monitor_screen.dart';
 import 'alerta_screen.dart';
 import 'umbrales_screen.dart';
-import 'device_screen.dart';
+import 'contacts_screen.dart';
 import 'login_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -22,8 +22,8 @@ class _HomeShellState extends State<HomeShell> {
   List<Widget> get _screens => const [
     MonitorScreen(),
     AlertaScreen(),
+    ContactsScreen(),
     UmbralesScreen(),
-    DeviceScreen(),
   ];
 
   @override
@@ -47,8 +47,8 @@ class _HomeShellState extends State<HomeShell> {
             children: [
               _navItem(0, Icons.favorite_rounded, 'Monitor'),
               _navItem(1, Icons.warning_rounded, 'Alertas'),
-              _navItem(2, Icons.settings_rounded, 'Ajustes'),
-              _navItem(3, Icons.wifi_rounded, 'Dispositivo'),
+              _navItem(2, Icons.people_rounded, 'Contactos'),
+              _navItem(3, Icons.settings_rounded, 'Ajustes'),
               // Logout
               InkWell(
                 onTap: () {
@@ -100,9 +100,8 @@ class _HomeShellState extends State<HomeShell> {
 
   Color _roleColor(Role? role) {
     switch (role) {
-      case Role.doctor: return const Color(0xFF2563EB);
-      case Role.admin: return const Color(0xFF7C3AED);
-      case Role.family: return const Color(0xFF10B981);
+      case Role.supervisor: return const Color(0xFF7C3AED);
+      case Role.paciente: return const Color(0xFF10B981);
       default: return const Color(0xFF2563EB);
     }
   }

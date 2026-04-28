@@ -19,15 +19,31 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   Future<void> _login() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Complete los campos obligatorios');
+      return;
+    }
+
     setState(() { _isLoading = true; _error = null; });
-    final ok = await AuthService().login(_emailCtrl.text.trim(), _passCtrl.text);
-    setState(() => _isLoading = false);
-    if (ok && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-      );
-    } else if (mounted) {
-      setState(() => _error = 'Email o contraseña incorrectos, volver a intenralo');
+    try {
+      await AuthService().login(email, password);
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeShell()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String msg = e.toString().replaceAll("Exception: ", "");
+        setState(() => _error = msg);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

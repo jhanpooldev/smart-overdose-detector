@@ -4,6 +4,7 @@ GestionarAlertaUseCase â€” Caso de uso: orquestar notificaciones ante evento crÃ
 from src.domain.entities.risk_event import RiskEvent, RiskLevel
 from src.domain.entities.emergency_contact import EmergencyContact
 from src.domain.ports.i_alert_notification_port import IAlertNotificationPort
+import time
 
 
 class GestionarAlertaUseCase:
@@ -21,6 +22,7 @@ class GestionarAlertaUseCase:
         self._alert_port = alert_port
         self._contacts = contacts
         self._notify_on_moderate = notify_on_moderate
+        self._last_alerts: dict[str, float] = {}
 
     def execute(self, event: RiskEvent) -> bool:
         if event.risk_level == RiskLevel.NORMAL:
@@ -28,6 +30,13 @@ class GestionarAlertaUseCase:
 
         if event.risk_level == RiskLevel.MODERATE and not self._notify_on_moderate:
             return False
+
+        current_time = time.time()
+        last_time = self._last_alerts.get(event.patient_id, 0.0)
+        if current_time - last_time < 5.0:
+            return False  # Cooldown de 5 segundos
+
+        self._last_alerts[event.patient_id] = current_time
 
         message = self._build_message(event)
         sent = False

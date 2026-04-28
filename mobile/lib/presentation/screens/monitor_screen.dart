@@ -21,6 +21,10 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
   RiskLevel _risk = RiskLevel.normal;
   late AnimationController _pulseCtrl;
 
+  bool _isConnected = true;
+  bool _isSensorPlaced = true;
+  Timer? _alertTimer;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,20 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
     return RiskLevel.normal;
   }
 
+  void _triggerAlert() {
+    if (_risk == RiskLevel.critical && _isConnected && _isSensorPlaced) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Alerta enviada a contactos de emergencia'),
+            backgroundColor: Color(0xFFDC2626),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _sensor.stopSimulation();
@@ -51,9 +69,15 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final isCritical = _risk == RiskLevel.critical;
-    final isDoctor = AuthService().currentUser?.role == Role.doctor;
+    final isCritical = _risk == RiskLevel.critical && _isConnected && _isSensorPlaced;
+    final isSupervisor = AuthService().currentUser?.role == Role.supervisor;
     final user = AuthService().currentUser;
+
+    if (isCritical && (_alertTimer == null || !_alertTimer!.isActive)) {
+      _alertTimer = Timer.periodic(const Duration(seconds: 5), (_) => _triggerAlert());
+    } else if (!isCritical) {
+      _alertTimer?.cancel();
+    }
 
     return Scaffold(
       backgroundColor: isCritical ? const Color(0xFFFEF2F2) : const Color(0xFFF0F4F8),
@@ -74,25 +98,139 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
           ],
         ),
         actions: [
-          if (isDoctor)
-            PopupMenuButton<ScenarioType>(
-              icon: const Icon(Icons.tune, color: Colors.white),
-              color: Colors.white,
-              tooltip: 'Cambiar escenario (Doctor)',
-              onSelected: (s) => _sensor.setScenario(s),
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: ScenarioType.normal, child: Text('🟢 Normal')),
-                const PopupMenuItem(value: ScenarioType.moderate, child: Text('🟡 Moderado')),
-                const PopupMenuItem(value: ScenarioType.critical, child: Text('🔴 Crítico')),
-              ],
+          if (isSupervisor)
+            IconButton(
+              icon: const Icon(Icons.settings_input_component, color: Colors.white),
+              tooltip: 'Simulador (Supervisor)',
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder: (ctx) => _buildSimulationSheet(ctx),
+                );
+              },
             ),
         ],
       ),
-      body: _reading == null
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
-          : isCritical
-              ? _buildCriticalView(_reading!)
-              : _buildNormalView(_reading!),
+      body: Column(
+        children: [
+          // Connection & Sensor Status Bar
+          Container(
+            color: _isConnected ? const Color(0xFFE0F2FE) : const Color(0xFFFEE2E2),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                      color: _isConnected ? const Color(0xFF0369A1) : const Color(0xFFB91C1C),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isConnected ? 'Conectado' : 'Desconectado',
+                      style: TextStyle(
+                        color: _isConnected ? const Color(0xFF0369A1) : const Color(0xFFB91C1C),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Text('Simular fallos:', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                    const SizedBox(width: 4),
+                    Switch(
+                      value: _isConnected,
+                      onChanged: (v) => setState(() => _isConnected = v),
+                      activeColor: const Color(0xFF0369A1),
+                    ),
+                    Switch(
+                      value: _isSensorPlaced,
+                      onChanged: (v) => setState(() => _isSensorPlaced = v),
+                      activeColor: const Color(0xFF10B981),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+          if (!_isConnected)
+            _buildErrorView('Dispositivo apagado', '-En espera-')
+          else if (!_isSensorPlaced)
+            _buildErrorView('No se están recibiendo datos, asegúrate que el sensor esté bien colocado', 'Sin datos')
+          else if (_reading == null)
+            const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))))
+          else
+            Expanded(
+              child: isCritical ? _buildCriticalView(_reading!) : _buildNormalView(_reading!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimulationSheet(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Simulador de Eventos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                onPressed: () { _sensor.setScenario(ScenarioType.normal); Navigator.pop(context); },
+                child: const Text('Leve (Normal)', style: TextStyle(color: Colors.white)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+                onPressed: () { _sensor.setScenario(ScenarioType.moderate); Navigator.pop(context); },
+                child: const Text('Moderado', style: TextStyle(color: Colors.white)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                onPressed: () { _sensor.setScenario(ScenarioType.critical); Navigator.pop(context); },
+                child: const Text('Crítico', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView(String message, String valueStr) {
+    return Expanded(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(message, style: const TextStyle(color: Color(0xFF991B1B)))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _bigMetricCard(
+            label: 'Frecuencia cardíaca:',
+            value: valueStr,
+            unit: '',
+            color: const Color(0xFF9CA3AF),
+            icon: Icons.favorite_border,
+          ),
+        ],
+      ),
     );
   }
 
@@ -100,6 +238,10 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const Center(
+          child: Text('Recibiendo datos', style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 8),
         // Status badge
         _statusBadge(),
         const SizedBox(height: 16),
@@ -207,11 +349,20 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
   }
 
   Widget _statusBadge() {
-    final (text, color) = switch (_risk) {
-      RiskLevel.normal => ('Estado: Normal', const Color(0xFF10B981)),
-      RiskLevel.moderate => ('Estado: Riesgo Moderado', const Color(0xFFF59E0B)),
-      RiskLevel.critical => ('Estado: Riesgo Crítico', const Color(0xFFDC2626)),
-    };
+    String text;
+    Color color;
+
+    if (_risk == RiskLevel.normal) {
+      text = 'Estado: Normal';
+      color = const Color(0xFF10B981);
+    } else if (_risk == RiskLevel.moderate) {
+      text = 'Estado: Bajo'; // As per PMV HU-005, we display Bajo/Alto instead of moderate/critical in text
+      color = const Color(0xFFF59E0B);
+    } else {
+      text = 'Estado: Alto';
+      color = const Color(0xFFDC2626);
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withOpacity(0.3))),
@@ -233,8 +384,8 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
             Row(children: [Icon(icon, color: color, size: 20), const SizedBox(width: 8), Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13))]),
             const SizedBox(height: 8),
             RichText(text: TextSpan(children: [
-              TextSpan(text: value, style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: color)),
-              TextSpan(text: ' $unit', style: TextStyle(fontSize: 22, color: color, fontWeight: FontWeight.w500)),
+              TextSpan(text: value, style: TextStyle(fontSize: value.length > 5 ? 32 : 56, fontWeight: FontWeight.bold, color: color)),
+              if (unit.isNotEmpty) TextSpan(text: ' $unit', style: TextStyle(fontSize: 22, color: color, fontWeight: FontWeight.w500)),
             ])),
           ],
         ),

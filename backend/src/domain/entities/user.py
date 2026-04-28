@@ -8,11 +8,8 @@ from typing import Optional
 
 
 class Role(str, Enum):
-    ADMIN = "ADMIN"
-    DOCTOR = "DOCTOR"
-    PATIENT = "PATIENT"
-    FAMILY = "FAMILY"
-
+    SUPERVISOR = "SUPERVISOR"
+    PACIENTE = "PACIENTE"
 
 @dataclass
 class User:
@@ -22,14 +19,8 @@ class User:
     hashed_password: str
     created_at: datetime
     
-    def is_admin(self) -> bool:
-        return self.role == Role.ADMIN
+    def is_supervisor(self) -> bool:
+        return self.role == Role.SUPERVISOR
         
-    def is_doctor(self) -> bool:
-        return self.role == Role.DOCTOR
-        
-    def is_patient(self) -> bool:
-        return self.role == Role.PATIENT
-        
-    def is_family(self) -> bool:
-        return self.role == Role.FAMILY
+    def is_paciente(self) -> bool:
+        return self.role == Role.PACIENTE
