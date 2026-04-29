@@ -9,25 +9,8 @@ import uuid
 
 class InMemoryUserRepository(IUserRepository):
     def __init__(self):
-        # Hash fijo para "123456" generado por sha256
-        hash_123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
-        self._users = {
-            "supervisor@sod.com": User(
-                id="00000000-0000-0000-0000-100000000001",
-                email="supervisor@sod.com",
-                role=Role.SUPERVISOR,
-                hashed_password=hash_123456,
-                created_at=datetime.now()
-            ),
-            "paciente@sod.com": User(
-                id="00000000-0000-0000-0000-100000000002",
-                email="paciente@sod.com",
-                role=Role.PACIENTE,
-                hashed_password=hash_123456,
-                created_at=datetime.now(),
-                supervisor_email="supervisor@sod.com"
-            )
-        }
+        # Sin datos de prueba — los usuarios se crean desde la app
+        self._users: dict[str, User] = {}
         
     def get_by_email(self, email: str) -> Optional[User]:
         return self._users.get(email)

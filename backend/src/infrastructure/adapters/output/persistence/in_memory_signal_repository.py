@@ -17,7 +17,12 @@ class InMemorySignalRepository(ISignalRepository):
     def save_reading(self, reading: BiometricReading) -> None:
         patient_id = getattr(reading, "patient_id", "unknown")
         self._store[patient_id].append(reading)
-        # Mantener solo las últimas 1000 lecturas por paciente (ventana temporal)
+        if len(self._store[patient_id]) > 1000:
+            self._store[patient_id] = self._store[patient_id][-1000:]
+
+    def save(self, patient_id: str, reading: BiometricReading) -> None:
+        """Alias compatible con endpoint POST /api/v1/readings."""
+        self._store[patient_id].append(reading)
         if len(self._store[patient_id]) > 1000:
             self._store[patient_id] = self._store[patient_id][-1000:]
 
