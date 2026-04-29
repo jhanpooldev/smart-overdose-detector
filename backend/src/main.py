@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.infrastructure.adapters.input.controllers.simulator_controller import router as simulator_router
 from src.infrastructure.adapters.input.controllers.risk_controller import router as risk_router
 from src.infrastructure.adapters.input.controllers.auth_controller import router as auth_router
+from src.infrastructure.adapters.input.controllers.contacts_controller import router as contacts_router
+from src.infrastructure.adapters.input.controllers.settings_controller import router as settings_router
 
 app = FastAPI(
     title="Smart Overdose Detector API",
@@ -23,6 +25,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(simulator_router)
 app.include_router(risk_router)
+app.include_router(contacts_router)
+app.include_router(settings_router)
 
 
 @app.get("/", tags=["Health"])

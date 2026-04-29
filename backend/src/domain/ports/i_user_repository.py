@@ -14,3 +14,7 @@ class IUserRepository(ABC):
     @abstractmethod
     def get_by_id(self, user_id: str) -> Optional[User]:
         pass
+
+    @abstractmethod
+    def get_all(self) -> list[User]:
+        pass

@@ -28,8 +28,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDoctor = AuthService().currentUser?.role == Role.doctor ||
-        AuthService().currentUser?.role == Role.admin;
+    final isSupervisor = AuthService().currentUser?.role == Role.supervisor;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
@@ -47,7 +46,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (!isDoctor)
+          if (!isSupervisor)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(10),
@@ -60,7 +59,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
                 children: [
                   Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 16),
                   SizedBox(width: 8),
-                  Expanded(child: Text('Solo el Doctor puede modificar estos parámetros.', style: TextStyle(color: Color(0xFF92400E), fontSize: 12))),
+                  Expanded(child: Text('Solo el Supervisor puede modificar estos parámetros.', style: TextStyle(color: Color(0xFF92400E), fontSize: 12))),
                 ],
               ),
             ),
@@ -70,11 +69,11 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  _dropdownRow('< ${_bpmNormal}', _bpmNormalOptions, _bpmNormal, isDoctor, (v) => setState(() => _bpmNormal = v!)),
+                  _dropdownRow('< ${_bpmNormal}', _bpmNormalOptions, _bpmNormal, isSupervisor, (v) => setState(() => _bpmNormal = v!)),
                   const Divider(height: 1),
-                  _dropdownRow('${_bpmModerado}', _bpmModeradoOptions, _bpmModerado, isDoctor, (v) => setState(() => _bpmModerado = v!)),
+                  _dropdownRow('${_bpmModerado}', _bpmModeradoOptions, _bpmModerado, isSupervisor, (v) => setState(() => _bpmModerado = v!)),
                   const Divider(height: 1),
-                  _dropdownRow('${_bpmCritico}', _bpmCriticoOptions, _bpmCritico, isDoctor, (v) => setState(() => _bpmCritico = v!)),
+                  _dropdownRow('${_bpmCritico}', _bpmCriticoOptions, _bpmCritico, isSupervisor, (v) => setState(() => _bpmCritico = v!)),
                 ],
               ),
             ),
@@ -88,17 +87,17 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  _stepperRow('Peso', '${_peso} kg', isDoctor,
+                  _stepperRow('Peso', '${_peso} kg', isSupervisor,
                     () => setState(() => _peso = (_peso - 1).clamp(30, 200)),
                     () => setState(() => _peso = (_peso + 1).clamp(30, 200)),
                   ),
                   const Divider(height: 1),
-                  _stepperRow('Altura', '${_altura.toStringAsFixed(2)} m', isDoctor,
+                  _stepperRow('Altura', '${_altura.toStringAsFixed(2)} m', isSupervisor,
                     () => setState(() => _altura = (_altura - 0.01).clamp(1.0, 2.5)),
                     () => setState(() => _altura = (_altura + 0.01).clamp(1.0, 2.5)),
                   ),
                   const Divider(height: 1),
-                  _dropdownRow('Historial:', _riesgoOptions, _historialRiesgo, isDoctor, (v) => setState(() => _historialRiesgo = v!)),
+                  _dropdownRow('Historial:', _riesgoOptions, _historialRiesgo, isSupervisor, (v) => setState(() => _historialRiesgo = v!)),
                 ],
               ),
             ),
@@ -106,7 +105,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
 
           const SizedBox(height: 24),
 
-          if (isDoctor)
+          if (isSupervisor)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

@@ -5,32 +5,27 @@ from typing import Optional
 from src.domain.entities.user import User, Role
 from src.domain.ports.i_user_repository import IUserRepository
 from datetime import datetime
+import uuid
 
 class InMemoryUserRepository(IUserRepository):
     def __init__(self):
         # Hash fijo para "123456" generado por sha256
         hash_123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
         self._users = {
-            "doctor@sod.com": User(
+            "supervisor@sod.com": User(
                 id="00000000-0000-0000-0000-100000000001",
-                email="doctor@sod.com",
-                role=Role.DOCTOR,
+                email="supervisor@sod.com",
+                role=Role.SUPERVISOR,
                 hashed_password=hash_123456,
                 created_at=datetime.now()
             ),
             "paciente@sod.com": User(
                 id="00000000-0000-0000-0000-100000000002",
                 email="paciente@sod.com",
-                role=Role.PATIENT,
+                role=Role.PACIENTE,
                 hashed_password=hash_123456,
-                created_at=datetime.now()
-            ),
-            "familiar@sod.com": User(
-                id="00000000-0000-0000-0000-100000000003",
-                email="familiar@sod.com",
-                role=Role.FAMILY,
-                hashed_password=hash_123456,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                supervisor_email="supervisor@sod.com"
             )
         }
         
@@ -42,3 +37,12 @@ class InMemoryUserRepository(IUserRepository):
             if u.id == user_id:
                 return u
         return None
+
+    def create_user(self, user: User) -> User:
+        if not user.id:
+            user.id = str(uuid.uuid4())
+        self._users[user.email] = user
+        return user
+
+    def get_all(self) -> list[User]:
+        return list(self._users.values())

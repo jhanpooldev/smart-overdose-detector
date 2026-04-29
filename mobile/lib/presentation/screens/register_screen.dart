@@ -1,6 +1,7 @@
 // lib/presentation/screens/register_screen.dart
 // Pantalla "Crear Cuenta" basada en el mockup del usuario
 import 'package:flutter/material.dart';
+import '../../infrastructure/auth/auth_service.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -14,9 +15,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _supervisorEmailCtrl = TextEditingController();
   int _edad = 30;
   int _peso = 75;
   String _sexo = 'Masculino';
+  String _role = 'Paciente';
+  bool _isLoading = false;
+  String? _error;
+
+  Future<void> _register() async {
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+    final confirm = _confirmCtrl.text;
+
+    if (name.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
+      setState(() => _error = 'complete los campos obligatorios');
+      return;
+    }
+    
+    if (!email.contains('@')) {
+      setState(() => _error = 'correo no válido');
+      return;
+    }
+
+    if (pass.length < 6) {
+      setState(() => _error = 'contraseña inválida');
+      return;
+    }
+
+    if (pass != confirm) {
+      setState(() => _error = 'Las contraseñas no coinciden');
+      return;
+    }
+
+    if (_role == 'Paciente' && _supervisorEmailCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'complete los campos obligatorios');
+      return;
+    }
+
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      await AuthService().register(
+        email, 
+        pass, 
+        name, 
+        supervisorEmail: _role == 'Paciente' ? _supervisorEmailCtrl.text.trim() : null
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cuenta creada correctamente'), backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String msg = e.toString().replaceAll("Exception: ", "");
+        setState(() => _error = msg);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +127,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.badge_outlined, color: Color(0xFF9CA3AF), size: 20),
+                        const SizedBox(width: 12),
+                        const Text('Rol', style: TextStyle(color: Color(0xFF4B5563))),
+                        const Spacer(),
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _role,
+                            items: ['Paciente', 'Supervisor'].map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 14)))).toList(),
+                            onChanged: (v) => setState(() => _role = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_role == 'Paciente') ...[
+                    const Divider(height: 1),
+                    _textField(icon: Icons.supervisor_account_outlined, hint: 'Correo de tu Supervisor', controller: _supervisorEmailCtrl),
+                  ]
+                ],
+              ),
+            ),
 
             const SizedBox(height: 16),
 
@@ -101,16 +199,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
 
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13)),
+            ],
+
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                },
-                child: const Text('Crear Cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                onPressed: _isLoading ? null : _register,
+                child: _isLoading
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Crear Cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 16),

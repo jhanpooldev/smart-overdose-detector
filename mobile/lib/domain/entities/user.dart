@@ -1,26 +1,26 @@
 // lib/domain/entities/user.dart
-enum Role { admin, doctor, patient, family }
+enum Role { supervisor, paciente }
 
 class User {
   final String email;
   final Role role;
+  final String? supervisorEmail;
 
-  User({required this.email, required this.role});
+  User({required this.email, required this.role, this.supervisorEmail});
 
   static Role _parseRole(String roleStr) {
     switch (roleStr.toUpperCase()) {
-      case 'ADMIN': return Role.admin;
-      case 'DOCTOR': return Role.doctor;
-      case 'PATIENT': return Role.patient;
-      case 'FAMILY': return Role.family;
-      default: return Role.patient;
+      case 'SUPERVISOR': return Role.supervisor;
+      case 'PACIENTE': return Role.paciente;
+      default: return Role.paciente;
     }
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       email: json['email'] ?? '',
-      role: _parseRole(json['role'] ?? 'PATIENT'),
+      role: _parseRole(json['role'] ?? 'PACIENTE'),
+      supervisorEmail: json['supervisor_email'],
     );
   }
 }
