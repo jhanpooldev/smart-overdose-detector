@@ -4,8 +4,9 @@ enum Role { supervisor, paciente }
 class User {
   final String email;
   final Role role;
+  final String? supervisorEmail;
 
-  User({required this.email, required this.role});
+  User({required this.email, required this.role, this.supervisorEmail});
 
   static Role _parseRole(String roleStr) {
     switch (roleStr.toUpperCase()) {
@@ -19,6 +20,7 @@ class User {
     return User(
       email: json['email'] ?? '',
       role: _parseRole(json['role'] ?? 'PACIENTE'),
+      supervisorEmail: json['supervisor_email'],
     );
   }
 }

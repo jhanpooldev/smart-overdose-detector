@@ -1,57 +1,123 @@
-// lib/presentation/screens/alerta_screen.dart
-// Pantalla 2 (⚠️) — Detalle de alerta + historial de eventos de riesgo
 import 'package:flutter/material.dart';
+import '../../infrastructure/auth/auth_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-class AlertaScreen extends StatelessWidget {
+class AlertaScreen extends StatefulWidget {
   const AlertaScreen({super.key});
 
   @override
+  State<AlertaScreen> createState() => _AlertaScreenState();
+}
+
+class _AlertaScreenState extends State<AlertaScreen> {
+  List<dynamic> _history = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final auth = AuthService();
+      final response = await http.get(
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/alerts?patient_id=PAT-001'),
+        headers: {
+          'Authorization': 'Bearer ${auth.token}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _history = jsonDecode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Error al cargar el historial';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error de conexión';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Historial simulado de eventos
-    final history = [
-      {'time': '23:05', 'bpm': 42, 'spo2': 76.5, 'level': 'CRITICAL'},
-      {'time': '22:47', 'bpm': 58, 'spo2': 87.2, 'level': 'MODERATE'},
-      {'time': '21:30', 'bpm': 72, 'spo2': 97.0, 'level': 'NORMAL'},
-      {'time': '20:10', 'bpm': 65, 'spo2': 95.5, 'level': 'NORMAL'},
-      {'time': '19:02', 'bpm': 48, 'spo2': 80.1, 'level': 'CRITICAL'},
-    ];
+    int criticalCount = _history.where((e) => e['level'] == 'CRITICAL').length;
+    int moderateCount = _history.where((e) => e['level'] == 'MODERATE').length;
+    int normalCount = _history.where((e) => e['level'] == 'NORMAL').length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       appBar: AppBar(
         title: const Text('Historial de Alertas'),
         backgroundColor: const Color(0xFF1D4ED8),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Summary card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Resumen hoy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _summaryItem('2', 'Críticos', const Color(0xFFDC2626)),
-                      _summaryItem('1', 'Moderados', const Color(0xFFF59E0B)),
-                      _summaryItem('2', 'Normales', const Color(0xFF10B981)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchHistory,
           ),
-          const SizedBox(height: 16),
-          const Text('Eventos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4B5563))),
-          const SizedBox(height: 8),
-          ...history.map((e) => _eventCard(e)),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text(_error!))
+              : RefreshIndicator(
+                  onRefresh: _fetchHistory,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Resumen reciente',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  _summaryItem(criticalCount.toString(), 'Críticos', const Color(0xFFDC2626)),
+                                  _summaryItem(moderateCount.toString(), 'Moderados', const Color(0xFFF59E0B)),
+                                  _summaryItem(normalCount.toString(), 'Normales', const Color(0xFF10B981)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Eventos Recientes',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4B5563))),
+                      const SizedBox(height: 8),
+                      if (_history.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text('No hay eventos registrados recientemente'),
+                          ),
+                        ),
+                      ..._history.map((e) => _eventCard(e)),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -77,6 +143,9 @@ class AlertaScreen extends StatelessWidget {
             ? Icons.warning_rounded
             : Icons.check_circle_rounded;
 
+    final DateTime dt = DateTime.parse(e['timestamp']);
+    final String timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -89,7 +158,7 @@ class AlertaScreen extends StatelessWidget {
           '${e['bpm']} BPM — SpO₂ ${e['spo2']}%',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
         ),
-        subtitle: Text(e['time'] as String, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+        subtitle: Text(timeStr, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

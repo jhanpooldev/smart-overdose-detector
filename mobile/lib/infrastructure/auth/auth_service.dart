@@ -13,8 +13,14 @@ class AuthService {
   User? currentUser;
   String? token;
 
-  // Usa 127.0.0.1 para Web, o 10.0.2.2 para emulador Android
-  final String baseUrl = kIsWeb ? "http://127.0.0.1:8000/api/v1/auth" : "http://10.0.2.2:8000/api/v1/auth";
+  // Se detectó el uso de emulador y dispositivos físicos.
+  // Esta lógica intenta elegir la mejor IP automáticamente.
+  String get baseUrl {
+    if (kIsWeb) return "http://127.0.0.1:8000/api/v1/auth";
+    // 10.0.2.2 es para el emulador de Android. 
+    // Si usas un celular físico, cambia '10.0.2.2' por '192.168.1.36'
+    return "http://10.0.2.2:8000/api/v1/auth";
+  }
 
   Future<void> login(String email, String password) async {
     try {
@@ -38,12 +44,16 @@ class AuthService {
     }
   }
 
-  Future<void> register(String email, String password, String name) async {
+  Future<void> register(String email, String password, String name, {String? supervisorEmail}) async {
     try {
+      final body = {'email': email, 'password': password, 'name': name};
+      if (supervisorEmail != null && supervisorEmail.isNotEmpty) {
+        body['supervisor_email'] = supervisorEmail;
+      }
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password, 'name': name}),
+        body: jsonEncode(body),
       );
 
       if (response.statusCode == 200) {

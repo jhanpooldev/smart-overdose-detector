@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import '../../domain/entities/user.dart';
+import 'supervisor_dashboard_screen.dart';
 import 'monitor_screen.dart';
 import 'alerta_screen.dart';
 import 'umbrales_screen.dart';
@@ -19,17 +20,20 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
 
-  List<Widget> get _screens => const [
-    MonitorScreen(),
-    AlertaScreen(),
-    ContactsScreen(),
-    UmbralesScreen(),
-  ];
+  List<Widget> get _screens {
+    final isSup = AuthService().currentUser?.role == Role.supervisor;
+    return [
+      isSup ? const SupervisorDashboardScreen() : const MonitorScreen(),
+      const AlertaScreen(),
+      const ContactsScreen(),
+      const UmbralesScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = AuthService().currentUser;
-    final roleColor = _roleColor(user?.role);
+    final isSup = user?.role == Role.supervisor;
 
     return Scaffold(
       body: IndexedStack(
@@ -45,7 +49,7 @@ class _HomeShellState extends State<HomeShell> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(0, Icons.favorite_rounded, 'Monitor'),
+              _navItem(0, Icons.favorite_rounded, isSup ? 'Pacientes' : 'Monitor'),
               _navItem(1, Icons.warning_rounded, 'Alertas'),
               _navItem(2, Icons.people_rounded, 'Contactos'),
               _navItem(3, Icons.settings_rounded, 'Ajustes'),

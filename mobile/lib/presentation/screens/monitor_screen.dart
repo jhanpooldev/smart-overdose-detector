@@ -2,11 +2,17 @@
 // Pantalla 1 (❤️) — Monitoreo en tiempo real. Se convierte en ALERTA CRÍTICA cuando el riesgo es alto.
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import '../../domain/entities/biometric_reading.dart';
 import '../../domain/entities/risk_prediction.dart';
 import '../../infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import '../../domain/entities/user.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'detail_status_screen.dart';
+import 'alerta_screen.dart';
 
 class MonitorScreen extends StatefulWidget {
   const MonitorScreen({super.key});
@@ -24,6 +30,8 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
   bool _isConnected = true;
   bool _isSensorPlaced = true;
   Timer? _alertTimer;
+  bool _callMade = false; // Garantiza que la llamada se haga UNA sola vez por episodio crítico
+  RiskLevel? _lastAlertSaved; // Evita guardar la misma alerta repetidamente
 
   @override
   void initState() {
@@ -31,6 +39,15 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
       ..repeat(reverse: true);
     _sensor.biometricStream.listen(_onReading);
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    // Pedir permiso de notificaciones y llamadas al inicio
+    await [
+      Permission.notification,
+      Permission.phone,
+    ].request();
   }
 
   void _onReading(BiometricReading r) {
@@ -38,6 +55,28 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
       _reading = r;
       _risk = _classify(r);
     });
+    _pushReadingToBackend(r);
+  }
+
+  Future<void> _pushReadingToBackend(BiometricReading r) async {
+    try {
+      final auth = AuthService();
+      if (auth.token == null) return;
+      
+      await http.post(
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/readings'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${auth.token}',
+        },
+        body: jsonEncode({
+          'patient_id': 'PAT-001', // Should be dynamic in a real app, using hardcoded for PMV
+          'spo2': r.spo2,
+          'bpm': r.bpm,
+          'activity': r.activity,
+        }),
+      );
+    } catch (_) {}
   }
 
   RiskLevel _classify(BiometricReading r) {
@@ -46,18 +85,58 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
     return RiskLevel.normal;
   }
 
-  void _triggerAlert() {
-    if (_risk == RiskLevel.critical && _isConnected && _isSensorPlaced) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Alerta enviada a contactos de emergencia'),
-            backgroundColor: Color(0xFFDC2626),
-            duration: Duration(seconds: 2),
-          ),
-        );
+  Future<void> _triggerAlert() async {
+    if (_risk != RiskLevel.normal && _isConnected && _isSensorPlaced) {
+      if (_risk == RiskLevel.critical && !_callMade) {
+        _callMade = true; // Bloquea llamadas futuras para este episodio
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Alerta Crítica - Llamando a emergencias'),
+              backgroundColor: Color(0xFFDC2626),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        await _makeEmergencyCall();
+      }
+      // Guardar alerta solo si cambió el nivel desde la última vez
+      if (_lastAlertSaved != _risk) {
+        _lastAlertSaved = _risk;
+        await _saveAlertToBackend(_risk);
       }
     }
+  }
+
+  Future<void> _makeEmergencyCall() async {
+    // Intentar llamar directamente al supervisor o número de emergencia
+    const number = '999999999'; // Dummy number para el PMV
+    bool? res = await FlutterPhoneDirectCaller.callNumber(number);
+    if (res == false && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo realizar la llamada automática')),
+      );
+    }
+  }
+
+  Future<void> _saveAlertToBackend(RiskLevel risk) async {
+    if (_reading == null) return;
+    try {
+      final auth = AuthService();
+      await http.post(
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/alerts/save'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${auth.token}',
+        },
+        body: jsonEncode({
+          'patient_id': 'PAT-001',
+          'risk_level': risk.name,
+          'spo2': _reading!.spo2,
+          'bpm': _reading!.bpm,
+        }),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -75,8 +154,15 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
 
     if (isCritical && (_alertTimer == null || !_alertTimer!.isActive)) {
       _alertTimer = Timer.periodic(const Duration(seconds: 5), (_) => _triggerAlert());
+      // Disparar inmediatamente la primera vez
+      Future.microtask(() => _triggerAlert());
     } else if (!isCritical) {
-      _alertTimer?.cancel();
+      if (_alertTimer?.isActive == true) {
+        _alertTimer?.cancel();
+        // Resetear flags al volver a estado no-crítico
+        _callMade = false;
+        _lastAlertSaved = null;
+      }
     }
 
     return Scaffold(
@@ -98,17 +184,14 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
           ],
         ),
         actions: [
-          if (isSupervisor)
-            IconButton(
-              icon: const Icon(Icons.settings_input_component, color: Colors.white),
-              tooltip: 'Simulador (Supervisor)',
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (ctx) => _buildSimulationSheet(ctx),
-                );
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No hay notificaciones pendientes')),
+              );
+            },
+          ),
         ],
       ),
       body: Column(
@@ -129,7 +212,7 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _isConnected ? 'Conectado' : 'Desconectado',
+                      _isConnected ? 'conectado' : 'desconectado',
                       style: TextStyle(
                         color: _isConnected ? const Color(0xFF0369A1) : const Color(0xFFB91C1C),
                         fontWeight: FontWeight.bold,
@@ -157,10 +240,35 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
               ],
             ),
           ),
+          if (!isSupervisor)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.white,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                    onPressed: () => _sensor.setScenario(ScenarioType.normal),
+                    child: const Text('Leve (Normal)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+                    onPressed: () => _sensor.setScenario(ScenarioType.moderate),
+                    child: const Text('Moderado', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                    onPressed: () => _sensor.setScenario(ScenarioType.critical),
+                    child: const Text('Crítico', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
           if (!_isConnected)
-            _buildErrorView('Dispositivo apagado', '-En espera-')
+            _buildErrorView('dispositivo apagado', '-En espera-', 'Estado: Sin datos')
           else if (!_isSensorPlaced)
-            _buildErrorView('No se están recibiendo datos, asegúrate que el sensor esté bien colocado', 'Sin datos')
+            _buildErrorView('no se está recibiendo datos, por favor asegurate que el dispositivo esté bien colocado', '-', 'Estado: Sin datos')
           else if (_reading == null)
             const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))))
           else
@@ -172,44 +280,21 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildSimulationSheet(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Simulador de Eventos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                onPressed: () { _sensor.setScenario(ScenarioType.normal); Navigator.pop(context); },
-                child: const Text('Leve (Normal)', style: TextStyle(color: Colors.white)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
-                onPressed: () { _sensor.setScenario(ScenarioType.moderate); Navigator.pop(context); },
-                child: const Text('Moderado', style: TextStyle(color: Colors.white)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                onPressed: () { _sensor.setScenario(ScenarioType.critical); Navigator.pop(context); },
-                child: const Text('Crítico', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorView(String message, String valueStr) {
+  Widget _buildErrorView(String message, String valueStr, String statusText) {
     return Expanded(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            decoration: BoxDecoration(color: const Color(0xFF6B7280).withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF6B7280).withOpacity(0.3))),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.circle, color: Color(0xFF6B7280), size: 10),
+              const SizedBox(width: 8),
+              Text(statusText, style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.bold, fontSize: 14)),
+            ]),
+          ),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8)),
@@ -270,7 +355,12 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
         const SizedBox(height: 12),
 
         OutlinedButton(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DetailStatusScreen()),
+            );
+          },
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFF2563EB)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -336,7 +426,12 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
         const SizedBox(height: 20),
 
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AlertaScreen()),
+            );
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2563EB),
             padding: const EdgeInsets.symmetric(vertical: 14),

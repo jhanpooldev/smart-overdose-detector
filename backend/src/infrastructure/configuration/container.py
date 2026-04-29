@@ -34,10 +34,14 @@ else:
     from src.infrastructure.adapters.output.persistence.in_memory_settings_repository import (
         InMemorySettingsRepository,
     )
+    from src.infrastructure.adapters.output.persistence.in_memory_risk_repository import (
+        InMemoryRiskRepository,
+    )
     signal_repository = InMemorySignalRepository()
     user_repository = InMemoryUserRepository()
     contact_repository = InMemoryContactRepository()
     settings_repository = InMemorySettingsRepository()
+    risk_repository = InMemoryRiskRepository()
     logging.getLogger(__name__).info("🗄️  Repositorio: Memoria RAM (sin BD persistente)")
 
 # 2. Resto de adaptadores
@@ -61,6 +65,7 @@ calculadora_riesgo = CalculadoraRiesgoService(anomaly_detection_port=anomaly_det
 evaluar_riesgo_use_case = EvaluarRiesgoUseCase(
     calculadora=calculadora_riesgo,
     signal_repository=signal_repository,
+    risk_repository=risk_repository,
 )
 
 gestionar_alerta_use_case = GestionarAlertaUseCase(

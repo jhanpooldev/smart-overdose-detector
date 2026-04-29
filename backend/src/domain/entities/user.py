@@ -18,6 +18,7 @@ class User:
     role: Role
     hashed_password: str
     created_at: datetime
+    supervisor_email: Optional[str] = None
     
     def is_supervisor(self) -> bool:
         return self.role == Role.SUPERVISOR

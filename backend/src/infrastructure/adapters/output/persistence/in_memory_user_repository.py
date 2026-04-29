@@ -24,7 +24,8 @@ class InMemoryUserRepository(IUserRepository):
                 email="paciente@sod.com",
                 role=Role.PACIENTE,
                 hashed_password=hash_123456,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                supervisor_email="supervisor@sod.com"
             )
         }
         
@@ -42,3 +43,6 @@ class InMemoryUserRepository(IUserRepository):
             user.id = str(uuid.uuid4())
         self._users[user.email] = user
         return user
+
+    def get_all(self) -> list[User]:
+        return list(self._users.values())

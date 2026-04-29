@@ -8,6 +8,7 @@ from src.domain.entities.risk_event import RiskEvent, RiskLevel, RiskPredictionR
 from src.domain.valueObjects.biometric_features import BiometricFeatures
 from src.application.services.calculadora_riesgo_service import CalculadoraRiesgoService
 from src.domain.ports.i_signal_repository import ISignalRepository
+from src.domain.ports.i_risk_repository import IRiskRepository
 
 
 class EvaluarRiesgoUseCase:
@@ -20,13 +21,15 @@ class EvaluarRiesgoUseCase:
         self,
         calculadora: CalculadoraRiesgoService,
         signal_repository: ISignalRepository,
+        risk_repository: IRiskRepository,
     ):
         self._calculadora = calculadora
-        self._repository = signal_repository
+        self._signal_repo = signal_repository
+        self._risk_repo = risk_repository
 
     def execute(self, patient_id: str, reading: BiometricReading) -> RiskEvent:
         # 1. Guardar la lectura en el repositorio
-        self._repository.save_reading(reading)
+        self._signal_repo.save_reading(reading)
 
         # 2. Construir el vector de features (value object inmutable)
         features = BiometricFeatures(
@@ -38,8 +41,8 @@ class EvaluarRiesgoUseCase:
         # 3. Delegar al servicio de dominio para evaluación de riesgo
         prediction: RiskPredictionResult = self._calculadora.evaluar(features)
 
-        # 4. Construir y retornar el evento de riesgo del dominio
-        return RiskEvent(
+        # 4. Construir el evento de riesgo del dominio
+        event = RiskEvent(
             event_id=str(uuid.uuid4()),
             patient_id=patient_id,
             risk_level=prediction.risk_level,
@@ -50,3 +53,9 @@ class EvaluarRiesgoUseCase:
             detected_at=datetime.now(),
             alert_sent=False,
         )
+
+        # 5. Guardar evento si es significativo (MODERATE o CRITICAL)
+        if event.risk_level != RiskLevel.NORMAL:
+            self._risk_repo.save(event)
+
+        return event

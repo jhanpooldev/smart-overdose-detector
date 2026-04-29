@@ -15,9 +15,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _supervisorEmailCtrl = TextEditingController();
   int _edad = 30;
   int _peso = 75;
   String _sexo = 'Masculino';
+  String _role = 'Paciente';
   bool _isLoading = false;
   String? _error;
 
@@ -28,17 +30,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final confirm = _confirmCtrl.text;
 
     if (name.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
-      setState(() => _error = 'Complete los campos obligatorios');
+      setState(() => _error = 'complete los campos obligatorios');
       return;
     }
     
     if (!email.contains('@')) {
-      setState(() => _error = 'Correo no válido');
+      setState(() => _error = 'correo no válido');
       return;
     }
 
     if (pass.length < 6) {
-      setState(() => _error = 'Contraseña inválida');
+      setState(() => _error = 'contraseña inválida');
       return;
     }
 
@@ -47,9 +49,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (_role == 'Paciente' && _supervisorEmailCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'complete los campos obligatorios');
+      return;
+    }
+
     setState(() { _isLoading = true; _error = null; });
     try {
-      await AuthService().register(email, pass, name);
+      await AuthService().register(
+        email, 
+        pass, 
+        name, 
+        supervisorEmail: _role == 'Paciente' ? _supervisorEmailCtrl.text.trim() : null
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cuenta creada correctamente'), backgroundColor: Colors.green),
@@ -112,6 +124,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _textField(icon: Icons.lock_outline, hint: 'Contraseña', controller: _passCtrl, obscure: true),
                   const Divider(height: 1),
                   _textField(icon: Icons.lock_outline, hint: 'Confirmar contraseña', controller: _confirmCtrl, obscure: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.badge_outlined, color: Color(0xFF9CA3AF), size: 20),
+                        const SizedBox(width: 12),
+                        const Text('Rol', style: TextStyle(color: Color(0xFF4B5563))),
+                        const Spacer(),
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _role,
+                            items: ['Paciente', 'Supervisor'].map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 14)))).toList(),
+                            onChanged: (v) => setState(() => _role = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_role == 'Paciente') ...[
+                    const Divider(height: 1),
+                    _textField(icon: Icons.supervisor_account_outlined, hint: 'Correo de tu Supervisor', controller: _supervisorEmailCtrl),
+                  ]
                 ],
               ),
             ),

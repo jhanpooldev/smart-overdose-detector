@@ -20,12 +20,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     email: str
+    supervisor_email: Optional[str] = None
 
 class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
     role: str = "PACIENTE"
+    supervisor_email: Optional[str] = None
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Extrae y valida el JWT, devolviendo el User asociado."""
@@ -58,7 +60,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     
     # Crear token
     token = auth_service.create_access_token(data={"sub": user.email, "role": str(user.role.value)})
-    return TokenResponse(access_token=token, role=user.role.value, email=user.email)
+    return TokenResponse(
+        access_token=token, 
+        role=user.role.value, 
+        email=user.email, 
+        supervisor_email=user.supervisor_email
+    )
 
 @router.post("/register", response_model=TokenResponse)
 async def register(req: RegisterRequest):
@@ -80,10 +87,34 @@ async def register(req: RegisterRequest):
         email=req.email,
         role=user_role,
         hashed_password=auth_service.get_password_hash(req.password),
-        created_at=datetime.now()
+        created_at=datetime.now(),
+        supervisor_email=req.supervisor_email
     )
     user_repository.create_user(new_user)
     
     # Crear token e iniciar sesion
     token = auth_service.create_access_token(data={"sub": new_user.email, "role": str(new_user.role.value)})
-    return TokenResponse(access_token=token, role=new_user.role.value, email=new_user.email)
+    return TokenResponse(
+        access_token=token, 
+        role=new_user.role.value, 
+        email=new_user.email, 
+        supervisor_email=new_user.supervisor_email
+    )
+
+@router.get("/patients", tags=["Users"])
+async def get_patients(current_user: User = Depends(get_current_user)):
+    """Retorna la lista de pacientes asignados al supervisor actual."""
+    if current_user.role != Role.SUPERVISOR:
+        raise HTTPException(status_code=403, detail="Solo los supervisores pueden ver pacientes")
+    
+    all_users = user_repository.get_all()
+    patients = [
+        {
+            "id": u.id,
+            "email": u.email,
+            "role": u.role.value,
+        }
+        for u in all_users
+        if u.role == Role.PACIENTE and u.supervisor_email == current_user.email
+    ]
+    return patients

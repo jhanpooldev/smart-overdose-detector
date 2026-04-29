@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Text('Cuentas de prueba (clave: 123456)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E))),
                     SizedBox(height: 4),
-                    Text('doctor@sod.com    →  Doctor\npaciente@sod.com  →  Paciente\nfamiliar@sod.com  →  Familiar', style: TextStyle(fontSize: 11, color: Color(0xFF78350F))),
+                    Text('supervisor@sod.com    →  Supervisor\npaciente@sod.com  →  Paciente', style: TextStyle(fontSize: 11, color: Color(0xFF78350F))),
                   ],
                 ),
               ),

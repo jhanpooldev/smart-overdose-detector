@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../infrastructure/auth/auth_service.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -8,9 +10,42 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  final List<Map<String, String>> _contacts = [
-    {'name': 'Juan Pérez', 'phone': '555-0100', 'relation': 'Hermano'},
-  ];
+  final List<Map<String, String>> _contacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialContacts();
+  }
+
+  void _loadInitialContacts() {
+    final user = AuthService().currentUser;
+    if (user != null && user.supervisorEmail != null && user.supervisorEmail!.isNotEmpty) {
+      _contacts.add({
+        'name': 'Supervisor',
+        'phone': '999999999', // Dummy number since we don't fetch supervisor's real number
+        'relation': 'Supervisor (Asignado)',
+        'email': user.supervisorEmail!
+      });
+    }
+    _contacts.add({'name': 'Juan Pérez', 'phone': '987654321', 'relation': 'Hermano'});
+  }
+
+  Future<void> _makeCall(String phone) async {
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phone,
+    );
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo iniciar la llamada')),
+        );
+      }
+    }
+  }
 
   void _addContact() {
     String name = '';
@@ -31,8 +66,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 onChanged: (v) => name = v,
               ),
               TextField(
-                decoration: const InputDecoration(labelText: 'Teléfono'),
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono (9 dígitos)',
+                  hintText: '9XXXXXXXX',
+                ),
                 keyboardType: TextInputType.phone,
+                maxLength: 9,
                 onChanged: (v) => phone = v,
               ),
               DropdownButton<String>(
@@ -58,15 +97,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ElevatedButton(
               onPressed: () {
                 if (name.isEmpty || phone.isEmpty) {
-                  setState(() => error = 'Complete los campos obligatorios');
+                  setState(() => error = 'complete los campos obligatorios');
                   return;
                 }
-                if (phone.length < 6) {
-                  setState(() => error = 'Número inválido');
+                // Validación para número peruano de 9 dígitos
+                final regExp = RegExp(r'^9\d{8}$');
+                if (!regExp.hasMatch(phone)) {
+                  setState(() => error = 'número inválido');
                   return;
                 }
                 if (_contacts.any((c) => c['phone'] == phone)) {
-                  setState(() => error = 'Contacto ya existente');
+                  setState(() => error = 'contacto ya existente');
                   return;
                 }
                 this.setState(() {
@@ -104,12 +145,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
               ),
               title: Text(c['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('${c['relation']} • ${c['phone']}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () {
-                  setState(() => _contacts.removeAt(index));
-                },
-              ),
+              onTap: () => _makeCall(c['phone']!),
+              trailing: c['email'] != null 
+                ? null 
+                : IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () {
+                      setState(() => _contacts.removeAt(index));
+                    },
+                  ),
             ),
           );
         },
