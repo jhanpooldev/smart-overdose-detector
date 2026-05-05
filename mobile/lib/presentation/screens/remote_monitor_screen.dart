@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../infrastructure/auth/auth_service.dart';
 import 'detail_status_screen.dart';
+import 'umbrales_screen.dart';
 
 class RemoteMonitorScreen extends StatefulWidget {
   final String patientId;
@@ -96,6 +97,18 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
             Text(widget.patientEmail, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: Colors.white),
+            tooltip: 'Ajustar Umbrales',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => UmbralesScreen(patientId: widget.patientId)),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../domain/entities/biometric_reading.dart';
 import '../../domain/entities/risk_prediction.dart';
 import '../../infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
@@ -43,10 +44,11 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
   }
 
   Future<void> _requestPermissions() async {
-    // Pedir permiso de notificaciones y llamadas al inicio
+    // Pedir permiso de notificaciones, llamadas y SMS al inicio
     await [
       Permission.notification,
       Permission.phone,
+      Permission.sms,
     ].request();
   }
 
@@ -109,14 +111,54 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
   }
 
   Future<void> _makeEmergencyCall() async {
-    // Intentar llamar directamente al supervisor o número de emergencia
-    const number = '999999999'; // Dummy number para el PMV
-    bool? res = await FlutterPhoneDirectCaller.callNumber(number);
-    if (res == false && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo realizar la llamada automática')),
+    try {
+      final auth = AuthService();
+      final response = await http.get(
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/contacts/'),
+        headers: {'Authorization': 'Bearer ${auth.token}'},
       );
-    }
+      if (response.statusCode == 200) {
+        final List<dynamic> contacts = jsonDecode(response.body);
+        if (contacts.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No hay contactos de emergencia registrados para llamar')),
+            );
+          }
+          return;
+        }
+
+        // Encontrar al supervisor (o al primer contacto si no hay supervisor)
+        final supervisor = contacts.firstWhere((c) => c['relacion'].toString().toLowerCase().contains('supervisor'), orElse: () => contacts.first);
+        final supervisorPhone = supervisor['telefono'];
+
+        // Enviar SMS a los demás contactos
+        final others = contacts.where((c) => c['telefono'] != supervisorPhone).map((c) => c['telefono']).toList();
+        if (others.isNotEmpty) {
+          final status = await Permission.sms.status;
+          if (status.isGranted) {
+            final smsUri = Uri(
+              scheme: 'sms',
+              path: others.join(','),
+              queryParameters: <String, String>{
+                'body': 'ALERTA CRÍTICA: El paciente ${auth.currentUser?.email} presenta ritmo y oxigenación anormales. Posible sobredosis.'
+              },
+            );
+            if (await canLaunchUrl(smsUri)) {
+              await launchUrl(smsUri);
+            }
+          }
+        }
+
+        // Llamar al supervisor
+        bool? res = await FlutterPhoneDirectCaller.callNumber(supervisorPhone);
+        if (res == false && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo realizar la llamada automática')),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _saveAlertToBackend(RiskLevel risk) async {
