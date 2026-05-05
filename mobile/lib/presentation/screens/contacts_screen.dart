@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../infrastructure/auth/auth_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -12,23 +14,40 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   final List<Map<String, String>> _contacts = [];
 
+  bool _isLoading = false;
+
   @override
   void initState() {
     super.initState();
-    _loadInitialContacts();
+    _fetchContacts();
   }
 
-  void _loadInitialContacts() {
-    final user = AuthService().currentUser;
-    if (user != null && user.supervisorEmail != null && user.supervisorEmail!.isNotEmpty) {
-      _contacts.add({
-        'name': 'Supervisor',
-        'phone': '999999999', // Dummy number since we don't fetch supervisor's real number
-        'relation': 'Supervisor (Asignado)',
-        'email': user.supervisorEmail!
-      });
+  Future<void> _fetchContacts() async {
+    setState(() => _isLoading = true);
+    try {
+      final auth = AuthService();
+      final response = await http.get(
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/contacts/'),
+        headers: {'Authorization': 'Bearer ${auth.token}'},
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _contacts.clear();
+          for (var item in data) {
+            _contacts.add({
+              'id': item['contact_id'],
+              'name': item['nombre'],
+              'phone': item['telefono'],
+              'relation': item['relacion'],
+            });
+          }
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    _contacts.add({'name': 'Juan Pérez', 'phone': '987654321', 'relation': 'Hermano'});
   }
 
   Future<void> _makeCall(String phone) async {
@@ -52,11 +71,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
     String phone = '';
     String relation = 'Familiar';
     String? error;
+    bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+        builder: (context, setStateModal) => AlertDialog(
           title: const Text('Nuevo Contacto'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -83,7 +103,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: Text(value),
                   );
                 }).toList(),
-                onChanged: (v) => setState(() => relation = v!),
+                onChanged: (v) => setStateModal(() => relation = v!),
               ),
               if (error != null)
                 Padding(
@@ -95,27 +115,46 @@ class _ContactsScreenState extends State<ContactsScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             ElevatedButton(
-              onPressed: () {
+              onPressed: isSaving ? null : () async {
                 if (name.isEmpty || phone.isEmpty) {
-                  setState(() => error = 'complete los campos obligatorios');
+                  setStateModal(() => error = 'complete los campos obligatorios');
                   return;
                 }
-                // Validación para número peruano de 9 dígitos
                 final regExp = RegExp(r'^9\d{8}$');
                 if (!regExp.hasMatch(phone)) {
-                  setState(() => error = 'número inválido');
+                  setStateModal(() => error = 'número inválido');
                   return;
                 }
-                if (_contacts.any((c) => c['phone'] == phone)) {
-                  setState(() => error = 'contacto ya existente');
-                  return;
+                
+                setStateModal(() { error = null; isSaving = true; });
+                
+                try {
+                  final auth = AuthService();
+                  final response = await http.post(
+                    Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/contacts/'),
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer ${auth.token}'
+                    },
+                    body: jsonEncode({
+                      'nombre': name,
+                      'telefono': phone,
+                      'relacion': relation,
+                      'es_principal': false
+                    })
+                  );
+                  if (response.statusCode == 200) {
+                    Navigator.pop(context);
+                    _fetchContacts();
+                  } else {
+                    final data = jsonDecode(response.body);
+                    setStateModal(() { error = data['detail'] ?? 'Error al guardar'; isSaving = false; });
+                  }
+                } catch (e) {
+                  setStateModal(() { error = 'Error de conexión'; isSaving = false; });
                 }
-                this.setState(() {
-                  _contacts.add({'name': name, 'phone': phone, 'relation': relation});
-                });
-                Navigator.pop(context);
               },
-              child: const Text('Guardar'),
+              child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Guardar'),
             ),
           ],
         ),

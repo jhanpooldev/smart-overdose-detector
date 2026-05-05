@@ -13,13 +13,15 @@ class AuthService {
   User? currentUser;
   String? token;
 
-  // Se detectó el uso de emulador y dispositivos físicos.
-  // Esta lógica intenta elegir la mejor IP automáticamente.
+  // ─── Configuración de URL ──────────────────────────────────────────────────
+  // Para emulador de Android: 10.0.2.2 (localhost del host)
+  // Para celular físico (APK): Cambia a la IP local de tu PC (ej: 192.168.1.36)
+  static const String _emulatorIp = '10.0.2.2';
+  static const int _port = 8000;
+
   String get baseUrl {
-    if (kIsWeb) return "http://127.0.0.1:8000/api/v1/auth";
-    // 10.0.2.2 es para el emulador de Android. 
-    // Si usas un celular físico, cambia '10.0.2.2' por '192.168.1.36'
-    return "http://10.0.2.2:8000/api/v1/auth";
+    if (kIsWeb) return 'http://127.0.0.1:$_port/api/v1/auth';
+    return 'http://$_emulatorIp:$_port/api/v1/auth';
   }
 
   Future<void> login(String email, String password) async {
@@ -44,16 +46,33 @@ class AuthService {
     }
   }
 
-  Future<void> register(String email, String password, String name, {String? supervisorEmail}) async {
+  Future<void> register(String email, String password, String name, {
+    String? supervisorEmail,
+    int? edad,
+    double? peso,
+    double? altura,
+    String? sexo,
+    String? telefono,
+    String role = 'Paciente',
+  }) async {
     try {
-      final body = {'email': email, 'password': password, 'name': name};
-      if (supervisorEmail != null && supervisorEmail.isNotEmpty) {
-        body['supervisor_email'] = supervisorEmail;
-      }
+      final bodyMap = <String, dynamic>{
+        'email': email,
+        'password': password,
+        'name': name,
+        'role': role.toUpperCase(),
+      };
+      if (supervisorEmail != null && supervisorEmail.isNotEmpty) bodyMap['supervisor_email'] = supervisorEmail;
+      if (edad != null) bodyMap['edad'] = edad;
+      if (peso != null) bodyMap['peso'] = peso;
+      if (altura != null) bodyMap['altura'] = altura;
+      if (sexo != null) bodyMap['sexo'] = sexo;
+      if (telefono != null) bodyMap['telefono'] = telefono;
+
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
+        body: jsonEncode(bodyMap),
       );
 
       if (response.statusCode == 200) {
