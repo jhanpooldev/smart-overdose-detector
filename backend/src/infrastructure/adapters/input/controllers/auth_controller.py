@@ -32,6 +32,7 @@ class RegisterRequest(BaseModel):
     peso: Optional[float] = None     # kg
     altura: Optional[float] = None   # metros
     sexo: Optional[str] = None       # 'Masculino' | 'Femenino' | 'Otro'
+    telefono: Optional[str] = None   # numero celular
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Extrae y valida el JWT, devolviendo el User asociado."""
@@ -86,6 +87,14 @@ async def register(req: RegisterRequest):
     except ValueError:
         user_role = Role.PACIENTE
 
+    if user_role == Role.PACIENTE and req.supervisor_email:
+        sup = user_repository.get_by_email(req.supervisor_email)
+        if not sup or sup.role != Role.SUPERVISOR:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supervisor no encontrado, verifica las credenciales"
+            )
+
     new_user = User(
         id=str(uuid.uuid4()),
         email=req.email,
@@ -97,8 +106,25 @@ async def register(req: RegisterRequest):
         peso=req.peso,
         altura=req.altura,
         sexo=req.sexo,
+        telefono=req.telefono,
     )
     user_repository.create_user(new_user)
+    
+    # Si es paciente y tiene supervisor, crear contacto de emergencia automáticamente
+    if user_role == Role.PACIENTE and req.supervisor_email:
+        sup = user_repository.get_by_email(req.supervisor_email)
+        if sup and sup.telefono:
+            from src.infrastructure.configuration.container import contact_repository
+            from src.domain.entities.emergency_contact import EmergencyContact
+            new_contact = EmergencyContact(
+                contact_id=str(uuid.uuid4()),
+                patient_id=new_user.id,
+                nombre="Supervisor",
+                telefono=sup.telefono,
+                relacion="Supervisor Medico",
+                es_principal=True
+            )
+            contact_repository.create(new_contact)
     
     # Crear token e iniciar sesion
     token = auth_service.create_access_token(data={"sub": new_user.email, "role": str(new_user.role.value)})
@@ -143,6 +169,45 @@ async def get_patient_thresholds(
     patient = user_repository.get_by_id(patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    return _calculate_thresholds(patient)
+
+class UpdateBiometricsRequest(BaseModel):
+    edad: int
+    peso: float
+    altura: float
+
+@router.put("/thresholds/{patient_id}", tags=["Thresholds"])
+async def update_patient_thresholds(
+    patient_id: str,
+    req: UpdateBiometricsRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Supervisor: actualiza los datos biométricos del paciente y retorna los nuevos umbrales."""
+    if current_user.role != Role.SUPERVISOR:
+        raise HTTPException(status_code=403, detail="Solo supervisores pueden modificar umbrales")
+    patient = user_repository.get_by_id(patient_id)
+    if not patient or patient.role != Role.PACIENTE:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    # Actually, we need to save the user, but since the repository might not have update, we can just use create_user?
+    # Wait, create_user replaces it? No, in SQLAlchemy it might throw duplicate key.
+    # Let's add an update directly or use the repository session.
+    # For now, let's just use raw SQL to update the user biometrics safely.
+    from src.infrastructure.adapters.output.persistence.postgres_repository import PostgresUserRepository
+    if isinstance(user_repository, PostgresUserRepository):
+        with user_repository._Session() as session:
+            from src.infrastructure.adapters.output.persistence.postgres_repository import UserORM
+            import uuid
+            row = session.query(UserORM).filter(UserORM.id == uuid.UUID(patient_id)).first()
+            if row:
+                row.edad = req.edad
+                row.peso = req.peso
+                row.altura = req.altura
+                session.commit()
+                patient.edad = req.edad
+                patient.peso = req.peso
+                patient.altura = req.altura
+
     return _calculate_thresholds(patient)
 
 def _calculate_thresholds(user: User) -> dict:

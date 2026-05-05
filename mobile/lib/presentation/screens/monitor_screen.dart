@@ -70,7 +70,7 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
           'Authorization': 'Bearer ${auth.token}',
         },
         body: jsonEncode({
-          'patient_id': 'PAT-001', // Should be dynamic in a real app, using hardcoded for PMV
+          'patient_id': auth.currentUser!.id,
           'spo2': r.spo2,
           'bpm': r.bpm,
           'activity': r.activity,
@@ -130,7 +130,7 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
           'Authorization': 'Bearer ${auth.token}',
         },
         body: jsonEncode({
-          'patient_id': 'PAT-001',
+          'patient_id': auth.currentUser!.id,
           'risk_level': risk.name,
           'spo2': _reading!.spo2,
           'bpm': _reading!.bpm,
@@ -187,8 +187,9 @@ class _MonitorScreenState extends State<MonitorScreen> with TickerProviderStateM
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No hay notificaciones pendientes')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AlertaScreen()),
               );
             },
           ),

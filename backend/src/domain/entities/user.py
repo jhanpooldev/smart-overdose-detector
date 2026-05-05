@@ -23,6 +23,7 @@ class User:
     peso: Optional[float] = None
     altura: Optional[float] = None
     sexo: Optional[str] = None
+    telefono: Optional[str] = None
     
     def is_supervisor(self) -> bool:
         return self.role == Role.SUPERVISOR

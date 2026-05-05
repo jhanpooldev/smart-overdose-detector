@@ -100,13 +100,45 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
   }
 
   Future<void> _saveThresholds() async {
+    if (widget.patientId == null) return;
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulado — PMV2 persistirá
-    if (mounted) {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Umbrales guardados correctamente'), backgroundColor: Color(0xFF10B981)),
+    try {
+      final auth = AuthService();
+      final url = '${auth.baseUrl.replaceAll('/auth', '')}/auth/thresholds/${widget.patientId}';
+      final resp = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${auth.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'edad': _edad,
+          'peso': _peso,
+          'altura': _altura,
+        }),
       );
+
+      if (resp.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Umbrales guardados correctamente'), backgroundColor: Color(0xFF10B981)),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('❌ Error al guardar umbrales'), backgroundColor: Color(0xFFDC2626)),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Error de conexión'), backgroundColor: Color(0xFFDC2626)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 

@@ -50,6 +50,7 @@ class UserORM(Base):
     peso             = Column(Float, nullable=True)
     altura           = Column(Float, nullable=True)
     sexo             = Column(String(20), nullable=True)
+    telefono         = Column(String(50), nullable=True)
     created_at       = Column(DateTime, nullable=False, default=datetime.now)
 
 
@@ -143,6 +144,7 @@ class PostgresUserRepository(IUserRepository):
             peso=user.peso,
             altura=user.altura,
             sexo=user.sexo,
+            telefono=user.telefono,
             created_at=user.created_at,
         )
         with self._Session() as session:
@@ -165,6 +167,7 @@ class PostgresUserRepository(IUserRepository):
             peso=row.peso,
             altura=row.altura,
             sexo=row.sexo,
+            telefono=row.telefono,
         )
 
 

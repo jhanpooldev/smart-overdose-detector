@@ -29,8 +29,9 @@ class _AlertaScreenState extends State<AlertaScreen> {
 
     try {
       final auth = AuthService();
+      final user = auth.currentUser;
       final response = await http.get(
-        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/alerts?patient_id=PAT-001'),
+        Uri.parse('${auth.baseUrl.replaceAll('/auth', '')}/alerts?patient_id=${user?.id}'),
         headers: {
           'Authorization': 'Bearer ${auth.token}',
         },

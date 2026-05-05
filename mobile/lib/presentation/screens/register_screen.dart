@@ -16,6 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _supervisorEmailCtrl = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
   int _edad = 30;
   int _peso = 75;
   double _altura = 1.70;
@@ -63,9 +64,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name, 
         supervisorEmail: _role == 'Paciente' ? _supervisorEmailCtrl.text.trim() : null,
         edad: _edad,
-        peso: _peso.toDouble(),
-        altura: _altura,
+        peso: _role == 'Paciente' ? _peso.toDouble() : null,
+        altura: _role == 'Paciente' ? _altura : null,
         sexo: _sexo,
+        telefono: _role == 'Supervisor' ? _telefonoCtrl.text.trim() : null,
         role: _role,
       );
       if (mounted) {
@@ -170,7 +172,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 16),
 
-            // Edad, peso, sexo
+            // Edad, peso, sexo o telefono dependiendo del rol
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -179,25 +181,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: Column(
                 children: [
-                  _stepperRow('Edad', '$_edad años', () => setState(() => _edad = (_edad - 1).clamp(10, 100)), () => setState(() => _edad = (_edad + 1).clamp(10, 100))),
-                  const Divider(height: 1),
-                  _stepperRow('Peso', '${_peso} kg', () => setState(() => _peso = (_peso - 1).clamp(30, 200)), () => setState(() => _peso = (_peso + 1).clamp(30, 200))),
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.height, color: Color(0xFF9CA3AF), size: 20),
-                        const SizedBox(width: 12),
-                        const Text('Altura', style: TextStyle(color: Color(0xFF4B5563))),
-                        const Spacer(),
-                        IconButton(icon: const Icon(Icons.remove, size: 18), onPressed: () => setState(() => _altura = (_altura - 0.01).clamp(1.0, 2.5))),
-                        Text('${_altura.toStringAsFixed(2)} m', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        IconButton(icon: const Icon(Icons.add, size: 18), onPressed: () => setState(() => _altura = (_altura + 0.01).clamp(1.0, 2.5))),
-                      ],
+                  if (_role == 'Supervisor') ...[
+                    _textField(icon: Icons.phone_android_outlined, hint: 'Número de Teléfono', controller: _telefonoCtrl, isNumber: true),
+                  ],
+                  if (_role == 'Paciente') ...[
+                    _stepperRow('Edad', '$_edad años', () => setState(() => _edad = (_edad - 1).clamp(10, 100)), () => setState(() => _edad = (_edad + 1).clamp(10, 100))),
+                    const Divider(height: 1),
+                    _stepperRow('Peso', '${_peso} kg', () => setState(() => _peso = (_peso - 1).clamp(30, 200)), () => setState(() => _peso = (_peso + 1).clamp(30, 200))),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.height, color: Color(0xFF9CA3AF), size: 20),
+                          const SizedBox(width: 12),
+                          const Text('Altura', style: TextStyle(color: Color(0xFF4B5563))),
+                          const Spacer(),
+                          IconButton(icon: const Icon(Icons.remove, size: 18), onPressed: () => setState(() => _altura = (_altura - 0.01).clamp(1.0, 2.5))),
+                          Text('${_altura.toStringAsFixed(2)} m', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          IconButton(icon: const Icon(Icons.add, size: 18), onPressed: () => setState(() => _altura = (_altura + 0.01).clamp(1.0, 2.5))),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Divider(height: 1),
+                    const Divider(height: 1),
+                  ],
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: Row(

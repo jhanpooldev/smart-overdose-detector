@@ -12,8 +12,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 'paciente@sod.com');
-  final _passCtrl = TextEditingController(text: '123456');
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _isLoading = false;
   bool _obscure = true;
   String? _error;
@@ -142,23 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
 
-              // Hint roles
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Cuentas de prueba (clave: 123456)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E))),
-                    SizedBox(height: 4),
-                    Text('supervisor@sod.com    →  Supervisor\npaciente@sod.com  →  Paciente', style: TextStyle(fontSize: 11, color: Color(0xFF78350F))),
-                  ],
-                ),
-              ),
               const SizedBox(height: 24),
             ],
           ),
