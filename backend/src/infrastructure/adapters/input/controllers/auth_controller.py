@@ -20,6 +20,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     email: str
+    id: str
     supervisor_email: Optional[str] = None
 
 class RegisterRequest(BaseModel):
@@ -69,6 +70,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         access_token=token, 
         role=user.role.value, 
         email=user.email, 
+        id=user.id,
         supervisor_email=user.supervisor_email
     )
 
@@ -132,6 +134,7 @@ async def register(req: RegisterRequest):
         access_token=token, 
         role=new_user.role.value, 
         email=new_user.email, 
+        id=new_user.id,
         supervisor_email=new_user.supervisor_email
     )
 

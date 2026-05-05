@@ -2,11 +2,12 @@
 enum Role { supervisor, paciente }
 
 class User {
+  final String id;
   final String email;
   final Role role;
   final String? supervisorEmail;
 
-  User({required this.email, required this.role, this.supervisorEmail});
+  User({required this.id, required this.email, required this.role, this.supervisorEmail});
 
   static Role _parseRole(String roleStr) {
     switch (roleStr.toUpperCase()) {
@@ -18,6 +19,7 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
+      id: json['id'] ?? '',
       email: json['email'] ?? '',
       role: _parseRole(json['role'] ?? 'PACIENTE'),
       supervisorEmail: json['supervisor_email'],

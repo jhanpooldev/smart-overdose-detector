@@ -52,6 +52,7 @@ class AuthService {
     double? peso,
     double? altura,
     String? sexo,
+    String? telefono,
     String role = 'Paciente',
   }) async {
     try {
@@ -66,6 +67,7 @@ class AuthService {
       if (peso != null) bodyMap['peso'] = peso;
       if (altura != null) bodyMap['altura'] = altura;
       if (sexo != null) bodyMap['sexo'] = sexo;
+      if (telefono != null) bodyMap['telefono'] = telefono;
 
       final response = await http.post(
         Uri.parse('$baseUrl/register'),

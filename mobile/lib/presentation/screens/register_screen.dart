@@ -259,10 +259,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _textField({required IconData icon, required String hint, required TextEditingController controller, bool obscure = false}) {
+  Widget _textField({required IconData icon, required String hint, required TextEditingController controller, bool obscure = false, bool isNumber = false}) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: const TextStyle(color: Color(0xFF111827), fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
