@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS users (
     hashed_password  VARCHAR(255) NOT NULL,
     role             VARCHAR(20)  NOT NULL CHECK (role IN ('PACIENTE', 'SUPERVISOR')),
     supervisor_email VARCHAR(255) NULL,
+    edad             INTEGER      NULL,
+    peso             NUMERIC(5,2) NULL,
+    altura           NUMERIC(4,2) NULL,
+    sexo             VARCHAR(20)  NULL,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

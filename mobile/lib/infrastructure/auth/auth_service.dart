@@ -44,16 +44,31 @@ class AuthService {
     }
   }
 
-  Future<void> register(String email, String password, String name, {String? supervisorEmail}) async {
+  Future<void> register(String email, String password, String name, {
+    String? supervisorEmail,
+    int? edad,
+    double? peso,
+    double? altura,
+    String? sexo,
+    String role = 'Paciente',
+  }) async {
     try {
-      final body = {'email': email, 'password': password, 'name': name};
-      if (supervisorEmail != null && supervisorEmail.isNotEmpty) {
-        body['supervisor_email'] = supervisorEmail;
-      }
+      final bodyMap = <String, dynamic>{
+        'email': email,
+        'password': password,
+        'name': name,
+        'role': role.toUpperCase(),
+      };
+      if (supervisorEmail != null && supervisorEmail.isNotEmpty) bodyMap['supervisor_email'] = supervisorEmail;
+      if (edad != null) bodyMap['edad'] = edad;
+      if (peso != null) bodyMap['peso'] = peso;
+      if (altura != null) bodyMap['altura'] = altura;
+      if (sexo != null) bodyMap['sexo'] = sexo;
+
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
+        body: jsonEncode(bodyMap),
       );
 
       if (response.statusCode == 200) {

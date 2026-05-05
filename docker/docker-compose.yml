@@ -9,16 +9,16 @@ services:
     container_name: sod_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: overdose_detector
-      POSTGRES_USER: sod_user
-      POSTGRES_PASSWORD: sod_secret
+      POSTGRES_DB: Overdose-detector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./scripts/db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+      - ../scripts/db/Overdose-detector.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sod_user -d overdose_detector"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d Overdose-detector"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,21 +28,21 @@ services:
   # ─────────────────────────────────────────────
   backend:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
     container_name: sod_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://sod_user:sod_secret@db:5432/overdose_detector
-      ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/Overdose-detector
+      STORAGE_BACKEND: postgres
+      ENV: production
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    # No montar volumen en producción (imagen autosuficiente)
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 2
 
 volumes:
   pgdata:

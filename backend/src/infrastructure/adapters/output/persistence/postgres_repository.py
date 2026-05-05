@@ -46,6 +46,10 @@ class UserORM(Base):
     hashed_password  = Column(String(255), nullable=False)
     role             = Column(String(20), nullable=False)
     supervisor_email = Column(String(255), nullable=True)
+    edad             = Column(Integer, nullable=True)
+    peso             = Column(Float, nullable=True)
+    altura           = Column(Float, nullable=True)
+    sexo             = Column(String(20), nullable=True)
     created_at       = Column(DateTime, nullable=False, default=datetime.now)
 
 
@@ -135,6 +139,10 @@ class PostgresUserRepository(IUserRepository):
             hashed_password=user.hashed_password,
             role=user.role.value,
             supervisor_email=user.supervisor_email,
+            edad=user.edad,
+            peso=user.peso,
+            altura=user.altura,
+            sexo=user.sexo,
             created_at=user.created_at,
         )
         with self._Session() as session:
@@ -153,6 +161,10 @@ class PostgresUserRepository(IUserRepository):
             role=Role(row.role),
             created_at=row.created_at,
             supervisor_email=row.supervisor_email,
+            edad=row.edad,
+            peso=row.peso,
+            altura=row.altura,
+            sexo=row.sexo,
         )
 
 

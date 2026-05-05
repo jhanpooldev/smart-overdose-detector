@@ -28,6 +28,10 @@ class RegisterRequest(BaseModel):
     name: str
     role: str = "PACIENTE"
     supervisor_email: Optional[str] = None
+    edad: Optional[int] = None       # años
+    peso: Optional[float] = None     # kg
+    altura: Optional[float] = None   # metros
+    sexo: Optional[str] = None       # 'Masculino' | 'Femenino' | 'Otro'
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Extrae y valida el JWT, devolviendo el User asociado."""
@@ -88,7 +92,11 @@ async def register(req: RegisterRequest):
         role=user_role,
         hashed_password=auth_service.get_password_hash(req.password),
         created_at=datetime.now(),
-        supervisor_email=req.supervisor_email
+        supervisor_email=req.supervisor_email,
+        edad=req.edad,
+        peso=req.peso,
+        altura=req.altura,
+        sexo=req.sexo,
     )
     user_repository.create_user(new_user)
     
@@ -118,3 +126,52 @@ async def get_patients(current_user: User = Depends(get_current_user)):
         if u.role == Role.PACIENTE and u.supervisor_email == current_user.email
     ]
     return patients
+
+@router.get("/thresholds", tags=["Thresholds"])
+async def get_my_thresholds(current_user: User = Depends(get_current_user)):
+    """Retorna los umbrales calculados del paciente autenticado."""
+    return _calculate_thresholds(current_user)
+
+@router.get("/thresholds/{patient_id}", tags=["Thresholds"])
+async def get_patient_thresholds(
+    patient_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Supervisor: obtiene los umbrales del paciente especificado."""
+    if current_user.role == Role.PACIENTE and current_user.id != patient_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    patient = user_repository.get_by_id(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    return _calculate_thresholds(patient)
+
+def _calculate_thresholds(user: User) -> dict:
+    """Calcula umbrales clinicos usando la formula de Tanaka."""
+    edad = user.edad or 30
+    peso = user.peso or 70.0
+    altura = user.altura or 1.70
+
+    # Frecuencia cardiaca maxima (Tanaka, 2001)
+    fc_max = 208 - (0.7 * edad)
+
+    # IMC y ajuste por obesidad
+    imc = peso / (altura ** 2)
+    ajuste = 5 if imc > 30 else 0
+
+    return {
+        "fc_max": round(fc_max),
+        "imc": round(imc, 1),
+        "bpm": {
+            "normal_min": 60,
+            "normal_max": round(0.75 * fc_max) - ajuste,
+            "moderate_lo": round(0.50 * fc_max),
+            "moderate_hi": round(0.90 * fc_max) + ajuste,
+            "critical_lo": 50,
+            "critical_hi": round(fc_max) + ajuste,
+        },
+        "spo2": {
+            "normal_min": 95.0,
+            "moderate_min": 90.0,
+            "critical_max": 82.0,
+        },
+    }

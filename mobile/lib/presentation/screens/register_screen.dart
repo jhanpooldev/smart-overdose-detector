@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _supervisorEmailCtrl = TextEditingController();
   int _edad = 30;
   int _peso = 75;
+  double _altura = 1.70;
   String _sexo = 'Masculino';
   String _role = 'Paciente';
   bool _isLoading = false;
@@ -60,7 +61,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email, 
         pass, 
         name, 
-        supervisorEmail: _role == 'Paciente' ? _supervisorEmailCtrl.text.trim() : null
+        supervisorEmail: _role == 'Paciente' ? _supervisorEmailCtrl.text.trim() : null,
+        edad: _edad,
+        peso: _peso.toDouble(),
+        altura: _altura,
+        sexo: _sexo,
+        role: _role,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -173,9 +179,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: Column(
                 children: [
-                  _stepperRow('Edad', '$_edad', () => setState(() => _edad = (_edad - 1).clamp(18, 120)), () => setState(() => _edad = (_edad + 1).clamp(18, 120))),
+                  _stepperRow('Edad', '$_edad años', () => setState(() => _edad = (_edad - 1).clamp(10, 100)), () => setState(() => _edad = (_edad + 1).clamp(10, 100))),
                   const Divider(height: 1),
-                  _stepperRow('Peso', '${_peso}kg', () => setState(() => _peso = (_peso - 1).clamp(30, 200)), () => setState(() => _peso = (_peso + 1).clamp(30, 200))),
+                  _stepperRow('Peso', '${_peso} kg', () => setState(() => _peso = (_peso - 1).clamp(30, 200)), () => setState(() => _peso = (_peso + 1).clamp(30, 200))),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.height, color: Color(0xFF9CA3AF), size: 20),
+                        const SizedBox(width: 12),
+                        const Text('Altura', style: TextStyle(color: Color(0xFF4B5563))),
+                        const Spacer(),
+                        IconButton(icon: const Icon(Icons.remove, size: 18), onPressed: () => setState(() => _altura = (_altura - 0.01).clamp(1.0, 2.5))),
+                        Text('${_altura.toStringAsFixed(2)} m', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        IconButton(icon: const Icon(Icons.add, size: 18), onPressed: () => setState(() => _altura = (_altura + 0.01).clamp(1.0, 2.5))),
+                      ],
+                    ),
+                  ),
                   const Divider(height: 1),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
