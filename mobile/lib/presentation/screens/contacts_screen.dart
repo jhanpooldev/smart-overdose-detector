@@ -165,42 +165,84 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFFF8FAFC), 
       appBar: AppBar(
-        title: const Text('Contactos de Emergencia'),
-        backgroundColor: const Color(0xFF1D4ED8),
+        title: const Text('Contactos de Emergencia', 
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: const Color(0xFF1E40AF), 
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _contacts.length,
-        itemBuilder: (context, index) {
-          final c = _contacts[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF2563EB),
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              title: Text(c['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${c['relation']} • ${c['phone']}'),
-              onTap: () => _makeCall(c['phone']!),
-              trailing: c['email'] != null 
-                ? null 
-                : IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () {
-                      setState(() => _contacts.removeAt(index));
-                    },
-                  ),
+      body: Column(
+        children: [
+          // Banner informativo superior
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF1E40AF),
+            child: const Text(
+              'Toca un contacto para llamar rápidamente en caso de emergencia.',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+              textAlign: TextAlign.center,
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: _isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _contacts.length,
+                  itemBuilder: (context, index) {
+                    final c = _contacts[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        leading: CircleAvatar(
+                          radius: 25,
+                          backgroundColor: const Color(0xFFDBEAFE),
+                          child: const Icon(Icons.person, color: Color(0xFF2563EB)),
+                        ),
+                        title: Text(c['name']!, 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('${c['relation']} • ${c['phone']}',
+                            style: TextStyle(color: Colors.grey[600])),
+                        ),
+                        onTap: () => _makeCall(c['phone']!),
+
+                        trailing: c['email'] != null 
+                          ? null 
+                          : IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                              onPressed: () {
+                                setState(() => _contacts.removeAt(index));
+                              },
+                            ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _addContact,
         backgroundColor: const Color(0xFF2563EB),
-        child: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Nuevo', style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
