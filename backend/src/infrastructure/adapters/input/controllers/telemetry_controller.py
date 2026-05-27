@@ -18,7 +18,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.application.useCases.monitorizar_signos_use_case import (
     MonitorizarSignosUseCase,
@@ -50,10 +50,11 @@ class TelemetryStreamRequest(BaseModel):
     status_movement: str = Field(default="UNKNOWN", description="STILL|WALKING|RUNNING|UNKNOWN")
     recorded_at:     Optional[datetime] = Field(None, description="Timestamp del dispositivo (ISO)")
 
-    @validator("session_token")
+    @field_validator("session_token")
+    @classmethod
     def token_must_be_alphanumeric(cls, v: str) -> str:
         if not v.isalnum():
-            raise ValueError("El token de sesión debe ser alfanumérico")
+            raise ValueError("El token de sesion debe ser alfanumerico")
         return v.upper()
 
 

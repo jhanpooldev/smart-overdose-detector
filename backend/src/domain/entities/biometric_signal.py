@@ -57,6 +57,19 @@ class BiometricSignal:
         if self.session_token and len(self.session_token) != 6:
             raise ValueError("El token de sesión IoT debe tener exactamente 6 caracteres")
 
+    @property
+    def bpm(self) -> int:
+        return self.heart_rate
+
+    @property
+    def timestamp(self) -> datetime:
+        return self.time
+
+    @property
+    def activity(self) -> int:
+        # STILL/UNKNOWN -> 0, WALKING/RUNNING -> 1
+        return 1 if self.status_movement in (MovementStatus.WALKING, MovementStatus.RUNNING) else 0
+
     @classmethod
     def create(
         cls,
@@ -83,3 +96,4 @@ class BiometricSignal:
             session_token=session_token,
             source=source,
         )
+

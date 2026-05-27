@@ -24,9 +24,12 @@ class User:
     altura: Optional[float] = None
     sexo: Optional[str] = None
     telefono: Optional[str] = None
+    nombre: Optional[str] = None
+    base_bio_profile: Optional[dict] = None
     
     def is_supervisor(self) -> bool:
         return self.role == Role.SUPERVISOR
         
     def is_paciente(self) -> bool:
         return self.role == Role.PACIENTE
+

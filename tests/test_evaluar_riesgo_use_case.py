@@ -31,9 +31,20 @@ def mock_repository():
 
 
 @pytest.fixture
-def use_case(mock_ai_port, mock_repository):
+def mock_risk_repository():
+    repo = MagicMock()
+    repo.save.return_value = MagicMock(event_id="evt-mock")
+    return repo
+
+
+@pytest.fixture
+def use_case(mock_ai_port, mock_repository, mock_risk_repository):
     calculadora = CalculadoraRiesgoService(anomaly_detection_port=mock_ai_port)
-    return EvaluarRiesgoUseCase(calculadora=calculadora, signal_repository=mock_repository)
+    return EvaluarRiesgoUseCase(
+        calculadora=calculadora,
+        signal_repository=mock_repository,
+        risk_repository=mock_risk_repository,
+    )
 
 
 class TestEvaluarRiesgoUseCase:
