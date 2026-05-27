@@ -5,14 +5,16 @@ from src.infrastructure.adapters.input.controllers.risk_controller import router
 from src.infrastructure.adapters.input.controllers.auth_controller import router as auth_router
 from src.infrastructure.adapters.input.controllers.contacts_controller import router as contacts_router
 from src.infrastructure.adapters.input.controllers.settings_controller import router as settings_router
+# PMV2 — Telemetría IoT
+from src.infrastructure.adapters.input.controllers.telemetry_controller import router as telemetry_router
 
 app = FastAPI(
     title="Smart Overdose Detector API",
     description=(
         "Backend con Arquitectura Hexagonal para detección temprana de sobredosis. "
-        "PMV1 — Datos de simulación biométrica."
+        "PMV1 — Simulación biométrica | PMV2 — Telemetría IoT con token de sesión."
     ),
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -27,6 +29,7 @@ app.include_router(simulator_router)
 app.include_router(risk_router)
 app.include_router(contacts_router)
 app.include_router(settings_router)
+app.include_router(telemetry_router)   # PMV2
 
 
 @app.get("/", tags=["Health"])
