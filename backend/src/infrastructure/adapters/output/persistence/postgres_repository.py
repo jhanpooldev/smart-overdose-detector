@@ -383,6 +383,11 @@ class PostgresSignalRepository(ISignalRepository, IBiometricSignalRepository):
         self._engine = _make_engine(database_url)
         self._Session = sessionmaker(bind=self._engine)
 
+    def test_connection(self) -> dict:
+        with self._Session() as session:
+            result = session.execute(text("SELECT version();")).scalar()
+            return {"db_version": str(result)}
+
     # --- Métodos de ISignalRepository (PMV1) ---
     def save_reading(self, reading: BiometricReading) -> None:
         patient_id_raw = getattr(reading, "patient_id", None)
