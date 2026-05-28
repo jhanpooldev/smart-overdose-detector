@@ -14,12 +14,15 @@ import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import '../../domain/models/biometric_signal_model.dart';
 import '../../infrastructure/api_client/api_client.dart';
 import '../../infrastructure/auth/auth_service.dart';
+import '../../infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
+import '../../infrastructure/telemetry/telemetry_service.dart';
 
 /// Número de puntos visibles en el gráfico de series temporales.
 const int _kChartWindowSize = 30;
 
 class MonitorScreenV2 extends StatefulWidget {
-  const MonitorScreenV2({super.key});
+  final bool isSimulated;
+  const MonitorScreenV2({super.key, this.isSimulated = false});
 
   @override
   State<MonitorScreenV2> createState() => _MonitorScreenV2State();
@@ -29,6 +32,8 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
     with TickerProviderStateMixin {
   // ── Servicios ─────────────────────────────────────────────────────────────
   final ApiClient _api = ApiClient();
+  final TelemetryService _telemetry = TelemetryService();
+  final SimulatedSensorAdapter _sensor = SimulatedSensorAdapter();
   Timer? _pollingTimer;
 
   // ── Estado de conexión ──────────────────────────────────────────────────────
@@ -45,6 +50,8 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   late Animation<double>   _pulseAnim;
 
   // ── Suscripciones ─────────────────────────────────────────────────────────
+  StreamSubscription<dynamic>? _signalSub;
+  StreamSubscription<dynamic>? _sensorSub;
 
   // ── Flags de alerta ───────────────────────────────────────────────────────
   bool _callMade   = false;
@@ -75,7 +82,55 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   // ── Inicializar sesión IoT y streams ──────────────────────────────────────
   Future<void> _initTelemetry() async {
-    _startPolling();
+    if (widget.isSimulated) {
+      _startSimulation();
+    } else {
+      _startPolling();
+    }
+  }
+
+  void _startSimulation() async {
+    setState(() => _isConnected = true);
+    // Escuchar señales procesadas por el backend
+    _signalSub = _telemetry.signalStream.listen(_onSignalReceived);
+
+    // Iniciar sesión IoT para simulación
+    try {
+      await _telemetry.startSession();
+    } catch (e) {
+      debugPrint('Error iniciando sesión IoT simulada: $e');
+    }
+
+    // Conectar sensor simulado → enviar vía TelemetryService
+    _sensorSub = _sensor.biometricStream.listen((rawReading) {
+      _telemetry.sendReading(
+        heartRate: rawReading.bpm as int,
+        spo2:      (rawReading.spo2 as double).round(),
+        statusMovement: rawReading.activity == 1 ? 'WALKING' : 'STILL',
+      );
+    });
+  }
+
+  void _onSignalReceived(BiometricSignalResponse signal) {
+    if (!mounted) return;
+    setState(() {
+      _latest = signal;
+      _tickIndex++;
+
+      _bpmSeries.add(FlSpot(_tickIndex.toDouble(), signal.heartRate.toDouble()));
+      _spo2Series.add(FlSpot(_tickIndex.toDouble(), signal.spo2.toDouble()));
+
+      if (_bpmSeries.length > _kChartWindowSize) {
+        _bpmSeries.removeAt(0);
+        _spo2Series.removeAt(0);
+      }
+    });
+
+    if (signal.riskLevel == RiskLevelV2.critical) {
+      _handleCriticalAlert(signal);
+    } else {
+      _resetAlertFlags();
+    }
   }
 
   void _startPolling() {
@@ -190,6 +245,9 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _signalSub?.cancel();
+    _sensorSub?.cancel();
+    _sensor.stopSimulation();
     _pulseCtrl.dispose();
     _alertReset?.cancel();
     super.dispose();
@@ -208,6 +266,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       body: Column(
         children: [
           _buildConnectionBar(),
+          if (widget.isSimulated) _buildScenarioBar(),
           Expanded(child: _buildBody(isCritical)),
         ],
       ),
@@ -270,6 +329,39 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       ),
     );
   }
+
+  Widget _buildScenarioBar() => Container(
+    color: const Color(0xFF0D1220),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const Text('Simular:', style: TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
+          const SizedBox(width: 8),
+          _scenarioBtn('Normal', ScenarioType.normal, const Color(0xFF10B981)),
+          const SizedBox(width: 6),
+          _scenarioBtn('Moderado', ScenarioType.moderate, const Color(0xFFF59E0B)),
+          const SizedBox(width: 6),
+          _scenarioBtn('Crítico', ScenarioType.critical, const Color(0xFFEF4444)),
+        ],
+      ),
+    ),
+  );
+
+  Widget _scenarioBtn(String label, ScenarioType type, Color color) => InkWell(
+    onTap: () => _sensor.setScenario(type),
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+    ),
+  );
 
 
 

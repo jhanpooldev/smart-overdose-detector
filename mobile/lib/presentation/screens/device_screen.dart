@@ -371,6 +371,29 @@ class _DeviceScreenState extends State<DeviceScreen>
                 ),
               ),
             ),
+
+          const SizedBox(height: 12),
+
+          // Botón Simular conexión
+          if (_session != null && !_isActive)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  _pollingTimer?.cancel();
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const MonitorScreenV2(isSimulated: true)),
+                  );
+                },
+                icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF10B981)),
+                label: const Text('Simular conexión local', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF10B981)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
         ],
       ),
     );
