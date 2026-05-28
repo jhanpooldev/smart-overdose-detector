@@ -112,11 +112,13 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _logoutButton() {
     return InkWell(
-      onTap: () {
-        AuthService().logout();
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
+      onTap: () async {
+        await AuthService().logout();
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          );
+        }
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),

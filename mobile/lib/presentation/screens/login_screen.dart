@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import 'home_shell.dart';
 import 'register_screen.dart';
+import 'package:local_auth/local_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,53 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscure = true;
   String? _error;
+
+  final _localAuth = LocalAuthentication();
+  bool _hasBiometrics = false;
+  bool _hasCredentials = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      final creds = await AuthService().getSavedCredentials();
+      if (mounted) {
+        setState(() {
+          _hasBiometrics = canCheck;
+          _hasCredentials = creds != null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Biometrics check error: $e');
+    }
+  }
+
+  Future<void> _biometricLogin() async {
+    if (!_hasCredentials) {
+      setState(() => _error = 'No hay credenciales guardadas. Inicie sesión manualmente primero.');
+      return;
+    }
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Autentíquese para ingresar a Smart Overdose Detector',
+      );
+      if (authenticated) {
+        final creds = await AuthService().getSavedCredentials();
+        if (creds != null) {
+          _emailCtrl.text = creds['email']!;
+          _passCtrl.text = creds['password']!;
+          await _login();
+        }
+      }
+    } catch (e) {
+      setState(() => _error = 'Error de autenticación biométrica');
+    }
+  }
 
   Future<void> _login() async {
     final email = _emailCtrl.text.trim();
@@ -156,6 +204,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       : const Text('Iniciar Sesión', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
+
+              if (_hasBiometrics && _hasCredentials) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: const Color(0xFF2563EB).withOpacity(0.5)),
+                      foregroundColor: const Color(0xFF60A5FA),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.fingerprint_rounded, size: 22),
+                    label: const Text('Ingresar con Biometría', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    onPressed: _isLoading ? null : _biometricLogin,
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 32),
               Row(
