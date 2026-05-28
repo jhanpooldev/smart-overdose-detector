@@ -191,6 +191,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
         ),
       ),
     );
+  }
+
   void _editContact(Map<String, String> contact) {
     String name = contact['name']!;
     String phone = contact['phone']!;
