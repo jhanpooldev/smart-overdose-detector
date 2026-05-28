@@ -7,6 +7,7 @@ import 'monitor_screen_v2.dart';
 import 'alerta_screen.dart';
 import 'umbrales_screen.dart';
 import 'contacts_screen.dart';
+import 'device_screen.dart';
 import 'login_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -22,16 +23,19 @@ class _HomeShellState extends State<HomeShell> {
   List<Widget> get _screens {
     final isSup = AuthService().currentUser?.role == Role.supervisor;
     if (isSup) {
+      // Supervisor: Pacientes | Alertas | Ajustes
       return [
         const SupervisorDashboardScreen(),
         const AlertaScreen(),
         const UmbralesScreen(),
       ];
     }
+    // Paciente: Monitor | Alertas | Contactos | Dispositivo | Ajustes
     return [
       const MonitorScreenV2(),
       const AlertaScreen(),
       const ContactsScreen(),
+      const DeviceScreen(),
       const UmbralesScreen(),
     ];
   }
@@ -50,47 +54,30 @@ class _HomeShellState extends State<HomeShell> {
         decoration: BoxDecoration(
           color: const Color(0xFF131929),
           border: Border(
-            top: BorderSide(
-              color: Colors.white.withOpacity(0.05),
-              width: 1,
-            ),
+            top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            )
+            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, -2)),
           ],
         ),
         child: SafeArea(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(0, isSup ? Icons.supervisor_account_rounded : Icons.favorite_rounded, isSup ? 'Pacientes' : 'Monitor'),
+              // Monitor (paciente) / Pacientes (supervisor)
+              _navItem(0,
+                  isSup ? Icons.supervisor_account_rounded : Icons.favorite_rounded,
+                  isSup ? 'Pacientes' : 'Monitor'),
+              // Alertas
               _navItem(1, Icons.warning_rounded, 'Alertas'),
+              // Contactos (solo paciente)
               if (!isSup) _navItem(2, Icons.people_rounded, 'Contactos'),
-              _navItem(isSup ? 2 : 3, Icons.settings_rounded, 'Ajustes'),
+              // Dispositivo (solo paciente) — RF08
+              if (!isSup) _navItem(3, Icons.watch_rounded, 'Dispositivo'),
+              // Ajustes
+              _navItem(isSup ? 2 : 4, Icons.settings_rounded, 'Ajustes'),
               // Logout
-              InkWell(
-                onTap: () {
-                  AuthService().logout();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 22),
-                      const SizedBox(height: 4),
-                      Text('Salir', style: TextStyle(color: Colors.red.shade400, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ),
+              _logoutButton(),
             ],
           ),
         ),
@@ -103,15 +90,11 @@ class _HomeShellState extends State<HomeShell> {
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF2563EB) : Colors.white38,
-              size: 22,
-            ),
+            Icon(icon, color: isSelected ? const Color(0xFF2563EB) : Colors.white38, size: 22),
             const SizedBox(height: 4),
             Text(
               label,
@@ -121,6 +104,28 @@ class _HomeShellState extends State<HomeShell> {
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _logoutButton() {
+    return InkWell(
+      onTap: () {
+        AuthService().logout();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 22),
+            const SizedBox(height: 4),
+            Text('Salir', style: TextStyle(color: Colors.red.shade400, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
