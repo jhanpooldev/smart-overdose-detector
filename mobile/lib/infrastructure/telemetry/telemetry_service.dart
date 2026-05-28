@@ -18,6 +18,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/biometric_signal_model.dart';
 import '../../domain/models/iot_session_model.dart';
 import '../api_client/api_client.dart';
+import '../sensors/simulated_sensor/simulated_sensor_adapter.dart';
 import '../auth/auth_service.dart';
 
 // ── Estado del stream ─────────────────────────────────────────────────────────
@@ -71,6 +72,32 @@ class TelemetryService {
   IoTSessionModel? get currentSession => _currentSession;
   StreamConnectionState get connectionState => _state;
   bool get isConnected => _state == StreamConnectionState.connected;
+
+  // ── Simulación ────────────────────────────────────────────────────────────
+  bool isSimulated = false;
+  final SimulatedSensorAdapter _sensor = SimulatedSensorAdapter();
+  StreamSubscription? _sensorSub;
+
+  void startSimulation() async {
+    isSimulated = true;
+    _sensorSub?.cancel();
+    try { await startSession(); } catch (_) {}
+    _sensorSub = _sensor.biometricStream.listen((raw) {
+      sendReading(
+        heartRate: raw.bpm as int,
+        spo2: (raw.spo2 as double).round(),
+        statusMovement: raw.activity == 1 ? 'WALKING' : 'STILL',
+      );
+    });
+  }
+
+  void stopSimulation() {
+    isSimulated = false;
+    _sensorSub?.cancel();
+    _sensor.stopSimulation();
+  }
+
+  void setScenario(ScenarioType type) => _sensor.setScenario(type);
 
   // ── Ciclo de vida ─────────────────────────────────────────────────────────
 
@@ -142,6 +169,7 @@ class TelemetryService {
 
   /// Desconecta la sesión actual limpiamente.
   void disconnect() {
+    stopSimulation();
     _heartbeatTimer?.cancel();
     _reconnectTimer?.cancel();
     _currentSession = null;

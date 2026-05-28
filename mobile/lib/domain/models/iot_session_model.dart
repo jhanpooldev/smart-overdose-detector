@@ -33,9 +33,9 @@ class IoTSessionModel {
     );
   }
 
-  bool get isConnected => streamStatus == 'CONNECTED';
+  bool get isConnected   => streamStatus == 'ACTIVE';
   bool get isDisconnected => streamStatus == 'DISCONNECTED';
-  bool get hasError => streamStatus == 'STREAM_ERROR';
+  bool get hasError       => streamStatus == 'STREAM_ERROR';
 
   /// Tiempo restante antes de expirar la sesión.
   Duration? get timeRemaining {

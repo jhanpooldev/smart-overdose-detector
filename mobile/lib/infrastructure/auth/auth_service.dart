@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/user.dart';
-
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class AuthService {
   // Singleton
   static final AuthService _instance = AuthService._internal();
@@ -12,6 +12,7 @@ class AuthService {
 
   User? currentUser;
   String? token;
+  final _storage = const FlutterSecureStorage();
 
   String get baseUrl {
     return 'https://smart-overdose-detector-production.up.railway.app/api/v1/auth';
@@ -30,6 +31,10 @@ class AuthService {
         final data = jsonDecode(response.body);
         token = data['access_token'];
         currentUser = User.fromJson(data);
+        
+        await _storage.write(key: 'saved_email', value: email);
+        await _storage.write(key: 'saved_password', value: password);
+        
         return;
       }
       final data = jsonDecode(response.body);
@@ -83,8 +88,19 @@ class AuthService {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     currentUser = null;
     token = null;
+    await _storage.delete(key: 'saved_email');
+    await _storage.delete(key: 'saved_password');
+  }
+
+  Future<Map<String, String>?> getSavedCredentials() async {
+    final email = await _storage.read(key: 'saved_email');
+    final password = await _storage.read(key: 'saved_password');
+    if (email != null && password != null) {
+      return {'email': email, 'password': password};
+    }
+    return null;
   }
 }

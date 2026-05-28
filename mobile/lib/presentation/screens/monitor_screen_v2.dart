@@ -12,7 +12,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 
 import '../../domain/models/biometric_signal_model.dart';
-import '../../domain/models/iot_session_model.dart';
 import '../../infrastructure/api_client/api_client.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import '../../infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
@@ -31,13 +30,13 @@ class MonitorScreenV2 extends StatefulWidget {
 class _MonitorScreenV2State extends State<MonitorScreenV2>
     with TickerProviderStateMixin {
   // ── Servicios ─────────────────────────────────────────────────────────────
+  final ApiClient _api = ApiClient();
   final TelemetryService _telemetry = TelemetryService();
   final SimulatedSensorAdapter _sensor = SimulatedSensorAdapter();
-  final ApiClient _api = ApiClient();
+  Timer? _pollingTimer;
 
-  // ── Estado de sesión ──────────────────────────────────────────────────────
-  IoTSessionModel? _session;
-  StreamConnectionState _connectionState = StreamConnectionState.disconnected;
+  // ── Estado de conexión ──────────────────────────────────────────────────────
+  bool _isConnected = false;
 
   // ── Datos en tiempo real ──────────────────────────────────────────────────
   BiometricSignalResponse? _latest;
@@ -51,8 +50,6 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   // ── Suscripciones ─────────────────────────────────────────────────────────
   StreamSubscription<dynamic>? _signalSub;
-  StreamSubscription<dynamic>? _stateSub;
-  StreamSubscription<dynamic>? _sensorSub;
 
   // ── Flags de alerta ───────────────────────────────────────────────────────
   bool _callMade   = false;
@@ -83,45 +80,21 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   // ── Inicializar sesión IoT y streams ──────────────────────────────────────
   Future<void> _initTelemetry() async {
-    // Escuchar estado de conexión
-    _stateSub = _telemetry.connectionStateStream.listen((event) {
-      if (mounted) setState(() => _connectionState = event.state);
-    });
-
-    // Escuchar señales procesadas por el backend
     _signalSub = _telemetry.signalStream.listen(_onSignalReceived);
-
-    // Iniciar sesión IoT
-    try {
-      final session = await _telemetry.startSession();
-      if (mounted) setState(() => _session = session);
-    } catch (e) {
-      debugPrint('Error iniciando sesión IoT: $e');
+    if (_telemetry.isSimulated) {
+      setState(() => _isConnected = true);
+    } else {
+      _startPolling();
     }
-
-    // Conectar sensor simulado → enviar vía TelemetryService
-    _sensorSub = _sensor.biometricStream.listen(_onSensorReading);
   }
 
-  // ── Callback: lectura del sensor simulado ─────────────────────────────────
-  void _onSensorReading(dynamic rawReading) {
-    // Enviar al backend a través del TelemetryService
-    _telemetry.sendReading(
-      heartRate: rawReading.bpm as int,
-      spo2:      (rawReading.spo2 as double).round(),
-      statusMovement: rawReading.activity == 1 ? 'WALKING' : 'STILL',
-    );
-  }
-
-  // ── Callback: señal procesada por el backend ──────────────────────────────
   void _onSignalReceived(BiometricSignalResponse signal) {
     if (!mounted) return;
-
     setState(() {
+      _isConnected = true;
       _latest = signal;
       _tickIndex++;
 
-      // Mantener ventana deslizante de _kChartWindowSize puntos
       _bpmSeries.add(FlSpot(_tickIndex.toDouble(), signal.heartRate.toDouble()));
       _spo2Series.add(FlSpot(_tickIndex.toDouble(), signal.spo2.toDouble()));
 
@@ -131,11 +104,58 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       }
     });
 
-    // Disparar alertas si es crítico (RF06)
     if (signal.riskLevel == RiskLevelV2.critical) {
       _handleCriticalAlert(signal);
     } else {
       _resetAlertFlags();
+    }
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _fetchLatestData());
+    _fetchLatestData();
+  }
+
+  Future<void> _fetchLatestData() async {
+    try {
+      final userId = AuthService().currentUser?.id ?? '';
+      if (userId.isEmpty) return;
+      
+      final history = await _api.getSignalHistory(patientId: userId, limit: _kChartWindowSize);
+      if (!mounted) return;
+
+      if (history.isEmpty) {
+        setState(() => _isConnected = false);
+        return;
+      }
+
+      // Comprobar si el último dato es reciente (menos de 1 minuto)
+      final latest = history.first;
+      final isRecent = DateTime.now().toUtc().difference(latest.time.toUtc()).inSeconds < 60;
+
+      setState(() {
+        _isConnected = isRecent;
+        _latest = latest;
+        
+        // Reconstruir gráficos
+        _bpmSeries.clear();
+        _spo2Series.clear();
+        
+        // La API devuelve los más recientes primero, así que invertimos para el gráfico
+        final reversed = history.reversed.toList();
+        for (int i = 0; i < reversed.length; i++) {
+          _bpmSeries.add(FlSpot(i.toDouble(), reversed[i].heartRate.toDouble()));
+          _spo2Series.add(FlSpot(i.toDouble(), reversed[i].spo2.toDouble()));
+        }
+      });
+
+      if (latest.riskLevel == RiskLevelV2.critical && isRecent) {
+        _handleCriticalAlert(latest);
+      } else {
+        _resetAlertFlags();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isConnected = false);
     }
   }
 
@@ -202,12 +222,10 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   // ── Dispose ───────────────────────────────────────────────────────────────
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _signalSub?.cancel();
-    _stateSub?.cancel();
-    _sensorSub?.cancel();
     _pulseCtrl.dispose();
     _alertReset?.cancel();
-    _sensor.stopSimulation();
     super.dispose();
   }
 
@@ -224,8 +242,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       body: Column(
         children: [
           _buildConnectionBar(),
-          if (_session != null) _buildTokenBanner(),
-          _buildScenarioBar(),
+          if (_telemetry.isSimulated) _buildScenarioBar(),
           Expanded(child: _buildBody(isCritical)),
         ],
       ),
@@ -270,19 +287,8 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   );
 
   Widget _buildConnectionBar() {
-    final isConnected = _connectionState == StreamConnectionState.connected;
-    final isError     = _connectionState == StreamConnectionState.error;
-    Color color = isConnected
-        ? const Color(0xFF10B981)
-        : isError
-            ? const Color(0xFFEF4444)
-            : const Color(0xFFF59E0B);
-    String label = switch (_connectionState) {
-      StreamConnectionState.connected    => '● Transmitiendo en tiempo real',
-      StreamConnectionState.connecting   => '○ Conectando...',
-      StreamConnectionState.error        => '✕ Error de conexión',
-      StreamConnectionState.disconnected => '○ Desconectado',
-    };
+    Color color = _isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    String label = _isConnected ? '● Transmitiendo en tiempo real' : '○ Esperando dispositivo...';
 
     return Container(
       color: color.withOpacity(0.12),
@@ -290,7 +296,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       child: Row(
         children: [
           Icon(
-            isConnected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+            _isConnected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
             color: color, size: 14,
           ),
           const SizedBox(width: 8),
@@ -299,33 +305,6 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       ),
     );
   }
-
-  Widget _buildTokenBanner() => Container(
-    color: const Color(0xFF0D1220),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    child: Row(
-      children: [
-        const Icon(Icons.key_rounded, color: Color(0xFF6B7280), size: 13),
-        const SizedBox(width: 6),
-        Text(
-          'Token IoT: ${_session!.sessionToken}',
-          style: const TextStyle(
-            color: Color(0xFF60A5FA),
-            fontSize: 12,
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
-        ),
-        const Spacer(),
-        if (_session!.timeRemaining != null)
-          Text(
-            'Expira en ${_session!.timeRemaining!.inHours}h',
-            style: const TextStyle(color: Color(0xFF4B5563), fontSize: 10),
-          ),
-      ],
-    ),
-  );
 
   Widget _buildScenarioBar() => Container(
     color: const Color(0xFF0D1220),
@@ -347,7 +326,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   );
 
   Widget _scenarioBtn(String label, ScenarioType type, Color color) => InkWell(
-    onTap: () => _sensor.setScenario(type),
+    onTap: () => _telemetry.setScenario(type),
     borderRadius: BorderRadius.circular(20),
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -359,6 +338,8 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
     ),
   );
+
+
 
   Widget _buildBody(bool isCritical) {
     if (_latest == null) {
@@ -402,6 +383,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
         label: 'BPM',
         value: '${_latest!.heartRate}',
         color: _latest!.riskLevel.color,
+        onTapDetails: () => _showDetailsSheet('BPM (Frecuencia Cardíaca)', _latest!.heartRate.toDouble(), 'BPM', _latest!.riskLevel.color),
       )),
       const SizedBox(width: 12),
       Expanded(child: _metricCard(
@@ -413,6 +395,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
             : _latest!.spo2 < 95
                 ? const Color(0xFFF59E0B)
                 : const Color(0xFF60A5FA),
+        onTapDetails: () => _showDetailsSheet('SpO₂ (Saturación)', _latest!.spo2.toDouble(), '%', const Color(0xFF60A5FA)),
       )),
     ],
   );
@@ -422,6 +405,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
     required String label,
     required String value,
     required Color color,
+    required VoidCallback onTapDetails,
   }) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -441,9 +425,79 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
         Text(value, style: TextStyle(
           color: color, fontSize: 36, fontWeight: FontWeight.bold, height: 1,
         )),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: onTapDetails,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Ver más detalles', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward_ios_rounded, color: color, size: 10),
+            ],
+          ),
+        ),
       ],
     ),
   );
+
+  void _showDetailsSheet(String title, double value, String unit, Color color) {
+    String advice = '';
+    String details = '';
+    if (title.contains('BPM')) {
+      details = 'La frecuencia cardíaca indica el número de latidos por minuto (BPM). Un rango normal en reposo es de 60 a 100 BPM.';
+      if (value < 50) advice = '⚠️ Bradicardia severa detectada. Riesgo de depresión respiratoria inducida por opioides. Busque atención médica inmediata.';
+      else if (value < 60) advice = 'ℹ️ Frecuencia ligeramente baja. Manténgase alerta si hay síntomas de somnolencia excesiva.';
+      else if (value > 120) advice = '⚠️ Taquicardia. Ritmo cardíaco elevado, mantenga reposo y evalúe otras causas.';
+      else advice = '✓ Frecuencia cardíaca dentro de los parámetros normales.';
+    } else {
+      details = 'La saturación de oxígeno (SpO₂) mide el porcentaje de oxígeno en la sangre. Un nivel normal es del 95% al 100%.';
+      if (value < 90) advice = '⚠️ Hipoxemia severa detectada. Los opioides pueden causar que la respiración se vuelva peligrosamente lenta o se detenga. Requiere intervención médica inmediata.';
+      else if (value < 95) advice = 'ℹ️ Nivel de oxígeno moderadamente bajo. Realice ejercicios de respiración profunda y mantenga vigilancia continua.';
+      else advice = '✓ Saturación de oxígeno en niveles óptimos y saludables.';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131929),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.analytics_outlined, color: color),
+                const SizedBox(width: 8),
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Lectura actual: ${value.toInt()}$unit', style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text('¿Qué significa?', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(details, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.3))),
+              child: Row(
+                children: [
+                  Icon(Icons.health_and_safety_rounded, color: color, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(advice, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildChartCard({
     required String title,
