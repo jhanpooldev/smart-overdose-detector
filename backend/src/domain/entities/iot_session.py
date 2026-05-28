@@ -51,7 +51,13 @@ class IoTSession:
 
     def is_expired(self) -> bool:
         """Verifica si la sesión ha expirado."""
-        return datetime.utcnow() > (self.expires_at or datetime.utcnow())
+        now = datetime.utcnow()
+        expires = self.expires_at
+        if expires is not None:
+            if expires.tzinfo is not None:
+                expires = expires.replace(tzinfo=None)
+            return now > expires
+        return False
 
     def is_active(self) -> bool:
         """Sesión activa = conectada y no expirada."""
