@@ -21,8 +21,7 @@ import '../../infrastructure/telemetry/telemetry_service.dart';
 const int _kChartWindowSize = 30;
 
 class MonitorScreenV2 extends StatefulWidget {
-  final bool isSimulated;
-  const MonitorScreenV2({super.key, this.isSimulated = false});
+  const MonitorScreenV2({super.key});
 
   @override
   State<MonitorScreenV2> createState() => _MonitorScreenV2State();
@@ -51,7 +50,6 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   // ── Suscripciones ─────────────────────────────────────────────────────────
   StreamSubscription<dynamic>? _signalSub;
-  StreamSubscription<dynamic>? _sensorSub;
 
   // ── Flags de alerta ───────────────────────────────────────────────────────
   bool _callMade   = false;
@@ -82,38 +80,18 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   // ── Inicializar sesión IoT y streams ──────────────────────────────────────
   Future<void> _initTelemetry() async {
-    if (widget.isSimulated) {
-      _startSimulation();
+    _signalSub = _telemetry.signalStream.listen(_onSignalReceived);
+    if (_telemetry.isSimulated) {
+      setState(() => _isConnected = true);
     } else {
       _startPolling();
     }
   }
 
-  void _startSimulation() async {
-    setState(() => _isConnected = true);
-    // Escuchar señales procesadas por el backend
-    _signalSub = _telemetry.signalStream.listen(_onSignalReceived);
-
-    // Iniciar sesión IoT para simulación
-    try {
-      await _telemetry.startSession();
-    } catch (e) {
-      debugPrint('Error iniciando sesión IoT simulada: $e');
-    }
-
-    // Conectar sensor simulado → enviar vía TelemetryService
-    _sensorSub = _sensor.biometricStream.listen((rawReading) {
-      _telemetry.sendReading(
-        heartRate: rawReading.bpm as int,
-        spo2:      (rawReading.spo2 as double).round(),
-        statusMovement: rawReading.activity == 1 ? 'WALKING' : 'STILL',
-      );
-    });
-  }
-
   void _onSignalReceived(BiometricSignalResponse signal) {
     if (!mounted) return;
     setState(() {
+      _isConnected = true;
       _latest = signal;
       _tickIndex++;
 
@@ -246,8 +224,6 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   void dispose() {
     _pollingTimer?.cancel();
     _signalSub?.cancel();
-    _sensorSub?.cancel();
-    _sensor.stopSimulation();
     _pulseCtrl.dispose();
     _alertReset?.cancel();
     super.dispose();
@@ -266,7 +242,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       body: Column(
         children: [
           _buildConnectionBar(),
-          if (widget.isSimulated) _buildScenarioBar(),
+          if (_telemetry.isSimulated) _buildScenarioBar(),
           Expanded(child: _buildBody(isCritical)),
         ],
       ),
@@ -350,7 +326,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   );
 
   Widget _scenarioBtn(String label, ScenarioType type, Color color) => InkWell(
-    onTap: () => _sensor.setScenario(type),
+    onTap: () => _telemetry.setScenario(type),
     borderRadius: BorderRadius.circular(20),
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

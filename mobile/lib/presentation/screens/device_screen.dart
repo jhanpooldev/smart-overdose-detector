@@ -9,6 +9,7 @@ import '../../infrastructure/api_client/api_client.dart';
 import '../../infrastructure/telemetry/telemetry_service.dart';
 import '../../domain/models/iot_session_model.dart';
 import 'monitor_screen_v2.dart';
+import 'home_shell.dart';
 
 class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key});
@@ -374,19 +375,18 @@ class _DeviceScreenState extends State<DeviceScreen>
 
           const SizedBox(height: 12),
 
-          // Botón Simular conexión
+          // Botón Confirmar (Simular)
           if (_session != null && !_isActive)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
                   _pollingTimer?.cancel();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const MonitorScreenV2(isSimulated: true)),
-                  );
+                  TelemetryService().startSimulation();
+                  homeShellKey.currentState?.switchToTab(0);
                 },
                 icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF10B981)),
-                label: const Text('Simular conexión local', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                label: const Text('Confirmar', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF10B981)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

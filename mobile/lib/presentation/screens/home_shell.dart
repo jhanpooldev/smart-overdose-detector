@@ -10,8 +10,10 @@ import 'contacts_screen.dart';
 import 'device_screen.dart';
 import 'login_screen.dart';
 
+final GlobalKey<_HomeShellState> homeShellKey = GlobalKey<_HomeShellState>();
+
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  HomeShell({Key? key}) : super(key: key ?? homeShellKey);
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -19,6 +21,10 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
+
+  void switchToTab(int index) {
+    if (mounted) setState(() => _currentIndex = index);
+  }
 
   List<Widget> get _screens {
     final isSup = AuthService().currentUser?.role == Role.supervisor;

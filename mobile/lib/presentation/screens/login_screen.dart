@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService().login(email, password);
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeShell()),
+          MaterialPageRoute(builder: (_) => HomeShell()),
         );
       }
     } catch (e) {
