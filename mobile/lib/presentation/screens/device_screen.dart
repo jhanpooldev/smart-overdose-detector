@@ -94,7 +94,16 @@ class _DeviceScreenState extends State<DeviceScreen>
     if (_session == null || !mounted) return;
     try {
       final updated = await _api.getSessionStatus(_session!.sessionToken);
-      if (mounted) setState(() => _session = updated);
+      if (mounted) {
+        final wasActive = _isActive;
+        setState(() => _session = updated);
+        if (!wasActive && _isActive) {
+          _showSnackBar('¡Dispositivo conectado exitosamente!');
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MonitorScreenV2()),
+          );
+        }
+      }
     } catch (_) {
       // Silencioso — no interrumpir la UI por fallo temporal de polling
     }
@@ -116,7 +125,7 @@ class _DeviceScreenState extends State<DeviceScreen>
     _showSnackBar('Token copiado al portapapeles ✓');
   }
 
-  bool get _isActive => _session?.streamStatus == 'ACTIVE';
+  bool get _isActive => _session?.streamStatus == 'ACTIVE' || _session?.isActive == true;
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   @override
