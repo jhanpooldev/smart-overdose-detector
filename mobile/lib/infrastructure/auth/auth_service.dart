@@ -13,16 +13,10 @@ class AuthService {
   User? currentUser;
   String? token;
 
-  // ─── Configuración de URL ──────────────────────────────────────────────────
-  // Para emulador de Android: 10.0.2.2 (localhost del host)
-  // Para celular físico (APK): Cambia a la IP local de tu PC (ej: 192.168.1.36)
-  static const String _emulatorIp = '10.0.2.2';
-  static const int _port = 8000;
-
   String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:$_port/api/v1/auth';
-    return 'http://$_emulatorIp:$_port/api/v1/auth';
+    return 'https://smart-overdose-detector-production.up.railway.app/api/v1/auth';
   }
+
 
   Future<void> login(String email, String password) async {
     try {

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import '../../domain/entities/user.dart';
 import 'supervisor_dashboard_screen.dart';
-import 'monitor_screen.dart';
+import 'monitor_screen_v2.dart';
 import 'alerta_screen.dart';
 import 'umbrales_screen.dart';
 import 'contacts_screen.dart';
@@ -30,7 +30,7 @@ class _HomeShellState extends State<HomeShell> {
       ];
     }
     return [
-      const MonitorScreen(),
+      const MonitorScreenV2(),
       const AlertaScreen(),
       const ContactsScreen(),
       const UmbralesScreen(),

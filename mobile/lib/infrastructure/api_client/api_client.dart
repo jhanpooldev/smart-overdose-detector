@@ -42,20 +42,10 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  // ── Configuración de URL según entorno ────────────────────────────────────
-  static const String _emulatorHost = '10.0.2.2';   // localhost para Android Studio
-  static const String _localPhysicalHost = '192.168.1.100'; // IP de tu PC en LAN
-  static const int    _port = 8000;
-
-  String get _baseHost {
-    if (kIsWeb) return '127.0.0.1';
-    // Cambia a _localPhysicalHost al probar con un dispositivo físico real
-    return _emulatorHost;
-  }
-
-  String get baseUrl => 'http://$_baseHost:$_port';
+  String get baseUrl => 'https://smart-overdose-detector-production.up.railway.app';
   String get _v1 => '$baseUrl/api/v1';
   String get _v2 => '$baseUrl/api/v2';
+
 
   // ── Headers con Auth ──────────────────────────────────────────────────────
   Map<String, String> get _authHeaders {
