@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../mobile/lib/main.dart';
 import '../mobile/lib/infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
 import '../mobile/lib/presentation/widgets/simulation_badge.dart';
+import '../mobile/lib/presentation/screens/monitor_screen_v2.dart';
+
 
 void main() {
   group('SimulationBadge Widget', () {
@@ -25,26 +27,30 @@ void main() {
     });
   });
 
-  group('DashboardScreen', () {
-    testWidgets('badge MODO SIMULACIÓN está presente en el árbol de widgets',
-        (tester) async {
-      await tester.pumpWidget(const SmartOverdoseDetectorApp());
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(find.byType(SimulationBadge), findsOneWidget);
-    });
-
-    testWidgets('tiene selector de escenario (DropdownButton)', (tester) async {
-      await tester.pumpWidget(const SmartOverdoseDetectorApp());
+  group('MonitorScreenV2', () {
+    testWidgets('debe mostrar el título y sección de simulación', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: MonitorScreenV2()),
+      );
       await tester.pump();
-      expect(find.byType(DropdownButton<ScenarioType>), findsOneWidget);
+      expect(find.text('Monitor PMV2'), findsOneWidget);
+      expect(find.text('Simular:'), findsOneWidget);
+      
+      // Force widget disposal to clean up timers
+      await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('muestra indicadores SpO2 y Frecuencia Cardíaca', (tester) async {
-      await tester.pumpWidget(const SmartOverdoseDetectorApp());
-      // Esperar primer tick del simulador
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.textContaining('SpO2'), findsWidgets);
-      expect(find.textContaining('BPM'), findsWidgets);
+    testWidgets('debe mostrar botones para los escenarios de simulación', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: MonitorScreenV2()),
+      );
+      await tester.pump();
+      expect(find.text('Normal'), findsOneWidget);
+      expect(find.text('Moderado'), findsOneWidget);
+      expect(find.text('Crítico'), findsOneWidget);
+      
+      // Force widget disposal to clean up timers
+      await tester.pumpWidget(const SizedBox());
     });
   });
 

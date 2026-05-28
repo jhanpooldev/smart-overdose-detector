@@ -22,9 +22,11 @@ class SimulatedSensorAdapter implements ISensorAdapter {
     _startSimulation();
   }
 
+  Timer? _timer;
+
   void _startSimulation() {
     _isRunning = true;
-    Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isRunning) {
         timer.cancel();
         return;
@@ -35,6 +37,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
 
   void stopSimulation() {
     _isRunning = false;
+    _timer?.cancel();
     _biometricController.close();
   }
 
