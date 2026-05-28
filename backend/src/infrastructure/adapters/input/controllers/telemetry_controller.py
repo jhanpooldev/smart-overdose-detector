@@ -144,11 +144,10 @@ async def ingest_telemetry_stream(
             detail=str(exc),
         )
     except Exception as exc:
-        import traceback
         logger.exception("Error inesperado en ingesta de telemetría: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error: {str(exc)}\n{traceback.format_exc()}",
+            detail="Error interno al procesar la señal",
         )
 
     return TelemetryStreamResponse(**result.__dict__)

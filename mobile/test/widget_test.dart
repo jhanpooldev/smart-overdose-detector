@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(const SmartOverdoseDetectorApp());
 
     // Verify that our app starts at LoginScreen and displays Bienvenido.
-    expect(find.text('Bienvenido'), findsOneWidget);
+    expect(find.text('Smart Overdose Detector'), findsOneWidget);
     expect(find.text('Iniciar Sesión'), findsOneWidget);
     expect(find.text('¿Aún no tienes cuenta?'), findsOneWidget);
   });

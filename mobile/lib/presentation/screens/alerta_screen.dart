@@ -1,3 +1,4 @@
+// lib/presentation/screens/alerta_screen.dart
 import 'package:flutter/material.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import 'dart:convert';
@@ -63,56 +64,71 @@ class _AlertaScreenState extends State<AlertaScreen> {
     int normalCount = _history.where((e) => e['level'] == 'NORMAL').length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        title: const Text('Historial de Alertas'),
-        backgroundColor: const Color(0xFF1D4ED8),
+        title: const Row(
+          children: [
+            Icon(Icons.history_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 8),
+            Text('Historial de Alertas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _fetchHistory,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.white70)))
               : RefreshIndicator(
+                  color: const Color(0xFF2563EB),
+                  backgroundColor: const Color(0xFF131929),
                   onRefresh: _fetchHistory,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     children: [
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Resumen reciente',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                children: [
-                                  _summaryItem(criticalCount.toString(), 'Críticos', const Color(0xFFDC2626)),
-                                  _summaryItem(moderateCount.toString(), 'Moderados', const Color(0xFFF59E0B)),
-                                  _summaryItem(normalCount.toString(), 'Normales', const Color(0xFF10B981)),
-                                ],
-                              ),
-                            ],
-                          ),
+                      // Summary Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131929),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Resumen Reciente',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _summaryItem(criticalCount.toString(), 'Críticos', const Color(0xFFEF4444)),
+                                Container(width: 1, height: 36, color: Colors.white12),
+                                _summaryItem(moderateCount.toString(), 'Moderados', const Color(0xFFF59E0B)),
+                                Container(width: 1, height: 36, color: Colors.white12),
+                                _summaryItem(normalCount.toString(), 'Normales', const Color(0xFF10B981)),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       const Text('Eventos Recientes',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4B5563))),
-                      const SizedBox(height: 8),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white70)),
+                      const SizedBox(height: 12),
                       if (_history.isEmpty)
                         const Center(
                           child: Padding(
-                            padding: EdgeInsets.all(20),
-                            child: Text('No hay eventos registrados recientemente'),
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Text('No hay eventos registrados recientemente', style: TextStyle(color: Colors.white30, fontSize: 13)),
                           ),
                         ),
                       ..._history.map((e) => _eventCard(e)),
@@ -125,8 +141,9 @@ class _AlertaScreenState extends State<AlertaScreen> {
   Widget _summaryItem(String value, String label, Color color) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.white30, fontSize: 11)),
       ],
     );
   }
@@ -134,7 +151,7 @@ class _AlertaScreenState extends State<AlertaScreen> {
   Widget _eventCard(Map<String, dynamic> e) {
     final level = e['level'] as String;
     final Color color = level == 'CRITICAL'
-        ? const Color(0xFFDC2626)
+        ? const Color(0xFFEF4444)
         : level == 'MODERATE'
             ? const Color(0xFFF59E0B)
             : const Color(0xFF10B981);
@@ -147,27 +164,44 @@ class _AlertaScreenState extends State<AlertaScreen> {
     final DateTime dt = DateTime.parse(e['timestamp']);
     final String timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: Container(
-          width: 4,
-          height: 48,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
-        ),
-        title: Text(
-          '${e['bpm']} BPM — SpO₂ ${e['spo2']}%',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
-        ),
-        subtitle: Text(timeStr, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 4),
-            Text(level, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${e['bpm']} BPM — SpO₂ ${e['spo2']}%',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(timeStr, style: const TextStyle(color: Colors.white30, fontSize: 11)),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text(level, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
+            ],
+          ),
+        ],
       ),
     );
   }

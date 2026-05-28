@@ -1,3 +1,4 @@
+// lib/presentation/screens/remote_monitor_screen.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -20,7 +21,7 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
   Timer? _pollingTimer;
   Map<String, dynamic>? _reading;
   bool _isLoading = true;
-  bool _isConnected = true; // Simulating connection status to backend
+  bool _isConnected = true;
 
   @override
   void initState() {
@@ -54,7 +55,6 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
           });
         }
       } else {
-        // Probablemente no hay lecturas aún o error 404
         if (mounted) {
           setState(() {
             _isConnected = false;
@@ -83,9 +83,10 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
     final isCritical = _reading != null && _reading!['risk_level'] == 'critical';
 
     return Scaffold(
-      backgroundColor: isCritical ? const Color(0xFFFEF2F2) : const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        backgroundColor: isCritical ? const Color(0xFFDC2626) : const Color(0xFF1D4ED8),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -93,7 +94,8 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Monitoreo Remoto', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            const Text('Monitoreo Remoto', style: TextStyle(fontSize: 11, color: Colors.white54)),
+            const SizedBox(height: 2),
             Text(widget.patientEmail, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
           ],
         ),
@@ -112,24 +114,43 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
       ),
       body: Column(
         children: [
+          // Translucent connection bar
           Container(
-            color: _isConnected ? const Color(0xFFE0F2FE) : const Color(0xFFFEE2E2),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: _isConnected ? const Color(0xFF10B981).withOpacity(0.08) : const Color(0xFFEF4444).withOpacity(0.08),
+              border: Border(
+                bottom: BorderSide(
+                  color: _isConnected ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFFEF4444).withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  _isConnected ? Icons.cloud_done : Icons.cloud_off,
-                  color: _isConnected ? const Color(0xFF0369A1) : const Color(0xFFB91C1C),
-                  size: 16,
+                Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    color: _isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isConnected ? const Color(0xFF10B981).withOpacity(0.6) : const Color(0xFFEF4444).withOpacity(0.6),
+                        blurRadius: 6,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Text(
-                  _isConnected ? 'Recibiendo datos del paciente' : 'Esperando datos del paciente...',
+                  _isConnected ? 'PACIENTE EN LÍNEA - RECIBIENDO TELEMETRÍA' : 'PACIENTE SIN CONEXIÓN - ESPERANDO DATOS',
                   style: TextStyle(
-                    color: _isConnected ? const Color(0xFF0369A1) : const Color(0xFFB91C1C),
+                    color: _isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: 11,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
@@ -138,166 +159,223 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))))
           else if (!_isConnected || _reading == null)
-            _buildErrorView('No se están recibiendo datos del paciente', 'Sin datos', 'Estado: Sin conexión')
+            _buildErrorView('No se están recibiendo signos vitales de este paciente.', 'Sin datos')
           else
             Expanded(
-              child: isCritical ? _buildCriticalView(_reading!) : _buildNormalView(_reading!),
+              child: _buildMonitorContent(_reading!),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorView(String message, String valueStr, String statusText) {
+  Widget _buildErrorView(String message, String valueStr) {
     return Expanded(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            decoration: BoxDecoration(color: const Color(0xFF6B7280).withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF6B7280).withOpacity(0.3))),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.circle, color: Color(0xFF6B7280), size: 10),
-              const SizedBox(width: 8),
-              Text(statusText, style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.bold, fontSize: 14)),
-            ]),
-          ),
-          const SizedBox(height: 16),
+          _statusBadge('offline'),
+          const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131929),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 24),
                 const SizedBox(width: 12),
-                Expanded(child: Text(message, style: const TextStyle(color: Color(0xFF991B1B)))),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _bigMetricCard(
-            label: 'Frecuencia cardíaca:',
+            label: 'Último Pulso Registrado',
             value: valueStr,
             unit: '',
-            color: const Color(0xFF9CA3AF),
-            icon: Icons.favorite_border,
+            color: Colors.white30,
+            icon: Icons.favorite_border_rounded,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNormalView(Map<String, dynamic> r) {
+  Widget _buildMonitorContent(Map<String, dynamic> r) {
+    final riskLevel = r['risk_level'] as String?;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       children: [
-        _statusBadge(r['risk_level']),
-        const SizedBox(height: 16),
+        _statusBadge(riskLevel),
+        const SizedBox(height: 20),
         _bigMetricCard(
-          label: 'Frecuencia cardíaca:',
+          label: 'Frecuencia Cardíaca',
           value: '${r['bpm']}',
           unit: 'BPM',
           color: _bpmColor(r['bpm']),
           icon: Icons.favorite_rounded,
         ),
-        const SizedBox(height: 12),
-        _smallMetricCard('Saturación (SpO₂)', '${r['spo2']}%', Icons.water_drop_rounded, _spo2Color(r['spo2'])),
+        const SizedBox(height: 16),
+        _smallMetricCard(
+          'Saturación de Oxígeno (SpO₂)',
+          '${r['spo2']?.toStringAsFixed(1)}%',
+          Icons.water_drop_rounded,
+          _spo2Color(r['spo2']),
+        ),
+        if (riskLevel == 'critical') ...[
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.emergency_rounded, color: Color(0xFFEF4444), size: 24),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'ATENCIÓN: PACIENTE EN RIESGO DE SOBREDOSIS',
+                    style: TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildCriticalView(Map<String, dynamic> r) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _statusBadge(r['risk_level']),
-        const SizedBox(height: 16),
-        _bigMetricCard(
-          label: 'Frecuencia cardíaca:',
-          value: '${r['bpm']}',
-          unit: 'BPM',
-          color: const Color(0xFFDC2626),
-          icon: Icons.favorite_rounded,
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFDC2626),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Center(
-            child: Text('PACIENTE EN RIESGO CRÍTICO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _statusBadge(String riskLevel) {
+  Widget _statusBadge(String? riskLevel) {
     String text;
     Color color;
 
     if (riskLevel == 'normal') {
-      text = 'Estado: Normal';
+      text = 'ESTADO DEL PACIENTE: NORMAL';
       color = const Color(0xFF10B981);
     } else if (riskLevel == 'moderate') {
-      text = 'Estado: Bajo';
+      text = 'ESTADO DEL PACIENTE: MODERADO';
       color = const Color(0xFFF59E0B);
+    } else if (riskLevel == 'critical') {
+      text = 'ESTADO DEL PACIENTE: CRÍTICO';
+      color = const Color(0xFFEF4444);
     } else {
-      text = 'Estado: Alto';
-      color = const Color(0xFFDC2626);
+      text = 'PACIENTE SIN CONEXIÓN';
+      color = Colors.white30;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withOpacity(0.3))),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.circle, color: color, size: 10),
-        const SizedBox(width: 8),
-        Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-      ]),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.circle, color: color, size: 8),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _bigMetricCard({required String label, required String value, required String unit, required Color color, required IconData icon}) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [Icon(icon, color: color, size: 20), const SizedBox(width: 8), Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13))]),
-            const SizedBox(height: 8),
-            RichText(text: TextSpan(children: [
-              TextSpan(text: value, style: TextStyle(fontSize: value.length > 5 ? 32 : 56, fontWeight: FontWeight.bold, color: color)),
-              if (unit.isNotEmpty) TextSpan(text: ' $unit', style: TextStyle(fontSize: 22, color: color, fontWeight: FontWeight.w500)),
-            ])),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            children: [
+              Text(
+                value,
+                style: TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: color, height: 1),
+              ),
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  unit,
+                  style: TextStyle(fontSize: 20, color: color.withOpacity(0.7), fontWeight: FontWeight.bold),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _smallMetricCard(String label, String value, IconData icon, Color color) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: color, size: 28),
-        title: Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
-        trailing: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ],
       ),
     );
   }
 
   Color _bpmColor(int bpm) {
-    if (bpm < 50 || bpm > 120) return const Color(0xFFDC2626);
+    if (bpm < 50 || bpm > 120) return const Color(0xFFEF4444);
     if (bpm < 60) return const Color(0xFFF59E0B);
     return const Color(0xFF2563EB);
   }
 
   Color _spo2Color(dynamic spo2) {
     final val = (spo2 is int) ? spo2.toDouble() : spo2 as double;
-    if (val < 82) return const Color(0xFFDC2626);
+    if (val < 82) return const Color(0xFFEF4444);
     if (val < 90) return const Color(0xFFF59E0B);
     return const Color(0xFF10B981);
   }

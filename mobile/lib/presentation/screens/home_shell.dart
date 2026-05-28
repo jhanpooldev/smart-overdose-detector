@@ -1,5 +1,4 @@
 // lib/presentation/screens/home_shell.dart
-// Shell con navegación inferior de 4 pantallas
 import 'package:flutter/material.dart';
 import '../../infrastructure/auth/auth_service.dart';
 import '../../domain/entities/user.dart';
@@ -49,8 +48,20 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -2))],
+          color: const Color(0xFF131929),
+          border: Border(
+            top: BorderSide(
+              color: Colors.white.withOpacity(0.05),
+              width: 1,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            )
+          ],
         ),
         child: SafeArea(
           child: Row(
@@ -73,9 +84,9 @@ class _HomeShellState extends State<HomeShell> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 24),
-                      const SizedBox(height: 2),
-                      Text('Salir', style: TextStyle(color: Colors.red.shade400, fontSize: 10)),
+                      Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 22),
+                      const SizedBox(height: 4),
+                      Text('Salir', style: TextStyle(color: Colors.red.shade400, fontSize: 10, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -96,24 +107,23 @@ class _HomeShellState extends State<HomeShell> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF9CA3AF), size: 24),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(
-              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF9CA3AF),
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            )),
+            Icon(
+              icon,
+              color: isSelected ? const Color(0xFF2563EB) : Colors.white38,
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? const Color(0xFF2563EB) : Colors.white38,
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Color _roleColor(Role? role) {
-    switch (role) {
-      case Role.supervisor: return const Color(0xFF7C3AED);
-      case Role.paciente: return const Color(0xFF10B981);
-      default: return const Color(0xFF2563EB);
-    }
   }
 }

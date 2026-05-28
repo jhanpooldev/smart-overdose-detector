@@ -175,9 +175,17 @@ async def get_patient_thresholds(
     return _calculate_thresholds(patient)
 
 class UpdateBiometricsRequest(BaseModel):
-    edad: int
-    peso: float
-    altura: float
+    edad: int | None = None
+    peso: float | None = None
+    altura: float | None = None
+    is_manual: bool | None = None
+    bpm_min_normal: int | None = None
+    bpm_max_normal: int | None = None
+    bpm_min_moderate: int | None = None
+    bpm_max_moderate: int | None = None
+    spo2_min_normal: float | None = None
+    spo2_min_moderate: float | None = None
+    spo2_min_critical: float | None = None
 
 @router.put("/thresholds/{patient_id}", tags=["Thresholds"])
 async def update_patient_thresholds(
@@ -185,36 +193,109 @@ async def update_patient_thresholds(
     req: UpdateBiometricsRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Supervisor: actualiza los datos biométricos del paciente y retorna los nuevos umbrales."""
-    if current_user.role != Role.SUPERVISOR:
-        raise HTTPException(status_code=403, detail="Solo supervisores pueden modificar umbrales")
+    """Actualiza datos biométricos y/o umbrales manuales del paciente."""
+    if current_user.role != Role.SUPERVISOR and current_user.id != patient_id:
+        raise HTTPException(status_code=403, detail="Solo supervisores o el propio paciente pueden modificar umbrales")
     patient = user_repository.get_by_id(patient_id)
     if not patient or patient.role != Role.PACIENTE:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     
-    # Actually, we need to save the user, but since the repository might not have update, we can just use create_user?
-    # Wait, create_user replaces it? No, in SQLAlchemy it might throw duplicate key.
-    # Let's add an update directly or use the repository session.
-    # For now, let's just use raw SQL to update the user biometrics safely.
+    if req.edad is not None: patient.edad = req.edad
+    if req.peso is not None: patient.peso = req.peso
+    if req.altura is not None: patient.altura = req.altura
+
     from src.infrastructure.adapters.output.persistence.postgres_repository import PostgresUserRepository
-    if isinstance(user_repository, PostgresUserRepository):
-        with user_repository._Session() as session:
-            from src.infrastructure.adapters.output.persistence.postgres_repository import UserORM
-            import uuid
-            row = session.query(UserORM).filter(UserORM.id == uuid.UUID(patient_id)).first()
-            if row:
-                row.edad = req.edad
-                row.peso = req.peso
-                row.altura = req.altura
+    from src.infrastructure.configuration.settings import settings
+
+    if settings.STORAGE_BACKEND == "postgres":
+        if isinstance(user_repository, PostgresUserRepository):
+            with user_repository._Session() as session:
+                from src.infrastructure.adapters.output.persistence.postgres_repository import UserORM, ThresholdORM
+                import uuid
+                user_row = session.query(UserORM).filter(UserORM.id == uuid.UUID(patient_id)).first()
+                if user_row:
+                    if req.edad is not None: user_row.edad = req.edad
+                    if req.peso is not None: user_row.peso = req.peso
+                    if req.altura is not None: user_row.altura = req.altura
+
+                if req.is_manual is False:
+                    session.query(ThresholdORM).filter(ThresholdORM.patient_id == uuid.UUID(patient_id)).delete()
+                elif any(x is not None for x in [req.bpm_min_normal, req.bpm_max_normal, req.bpm_min_moderate, req.bpm_max_moderate, req.spo2_min_normal, req.spo2_min_moderate, req.spo2_min_critical]):
+                    thresh_row = session.query(ThresholdORM).filter(ThresholdORM.patient_id == uuid.UUID(patient_id)).first()
+                    if not thresh_row:
+                        thresh_row = ThresholdORM(patient_id=uuid.UUID(patient_id))
+                        session.add(thresh_row)
+                    
+                    tanaka = _calculate_thresholds(patient)
+                    if req.bpm_min_normal is not None: thresh_row.bpm_min_normal = req.bpm_min_normal
+                    else: thresh_row.bpm_min_normal = thresh_row.bpm_min_normal or tanaka["bpm"]["normal_min"]
+
+                    if req.bpm_max_normal is not None: thresh_row.bpm_max_normal = req.bpm_max_normal
+                    else: thresh_row.bpm_max_normal = thresh_row.bpm_max_normal or tanaka["bpm"]["normal_max"]
+
+                    if req.bpm_min_moderate is not None: thresh_row.bpm_min_moderate = req.bpm_min_moderate
+                    else: thresh_row.bpm_min_moderate = thresh_row.bpm_min_moderate or tanaka["bpm"]["moderate_lo"]
+
+                    if req.bpm_max_moderate is not None: thresh_row.bpm_max_moderate = req.bpm_max_moderate
+                    else: thresh_row.bpm_max_moderate = thresh_row.bpm_max_moderate or tanaka["bpm"]["moderate_hi"]
+
+                    if req.spo2_min_normal is not None: thresh_row.spo2_min_normal = int(req.spo2_min_normal)
+                    else: thresh_row.spo2_min_normal = thresh_row.spo2_min_normal or int(tanaka["spo2"]["normal_min"])
+
+                    if req.spo2_min_moderate is not None: thresh_row.spo2_min_moderate = int(req.spo2_min_moderate)
+                    else: thresh_row.spo2_min_moderate = thresh_row.spo2_min_moderate or int(tanaka["spo2"]["moderate_min"])
+
+                    if req.spo2_min_critical is not None: thresh_row.spo2_min_critical = int(req.spo2_min_critical)
+                    else: thresh_row.spo2_min_critical = thresh_row.spo2_min_critical or int(tanaka["spo2"]["critical_max"])
+
                 session.commit()
-                patient.edad = req.edad
-                patient.peso = req.peso
-                patient.altura = req.altura
+    else:
+        if not hasattr(user_repository, "_custom_thresholds"):
+            user_repository._custom_thresholds = {}
+        
+        if req.is_manual is False:
+            if patient_id in user_repository._custom_thresholds:
+                del user_repository._custom_thresholds[patient_id]
+        elif any(x is not None for x in [req.bpm_min_normal, req.bpm_max_normal, req.bpm_min_moderate, req.bpm_max_moderate, req.spo2_min_normal, req.spo2_min_moderate, req.spo2_min_critical]):
+            tanaka = _calculate_thresholds(patient)
+            existing = user_repository._custom_thresholds.get(patient_id, {})
+            user_repository._custom_thresholds[patient_id] = {
+                "bpm_min_normal": req.bpm_min_normal if req.bpm_min_normal is not None else existing.get("bpm_min_normal", tanaka["bpm"]["normal_min"]),
+                "bpm_max_normal": req.bpm_max_normal if req.bpm_max_normal is not None else existing.get("bpm_max_normal", tanaka["bpm"]["normal_max"]),
+                "bpm_min_moderate": req.bpm_min_moderate if req.bpm_min_moderate is not None else existing.get("bpm_min_moderate", tanaka["bpm"]["moderate_lo"]),
+                "bpm_max_moderate": req.bpm_max_moderate if req.bpm_max_moderate is not None else existing.get("bpm_max_moderate", tanaka["bpm"]["moderate_hi"]),
+                "spo2_min_normal": req.spo2_min_normal if req.spo2_min_normal is not None else existing.get("spo2_min_normal", tanaka["spo2"]["normal_min"]),
+                "spo2_min_moderate": req.spo2_min_moderate if req.spo2_min_moderate is not None else existing.get("spo2_min_moderate", tanaka["spo2"]["moderate_min"]),
+                "spo2_min_critical": req.spo2_min_critical if req.spo2_min_critical is not None else existing.get("spo2_min_critical", tanaka["spo2"]["critical_max"]),
+            }
 
     return _calculate_thresholds(patient)
 
 def _calculate_thresholds(user: User) -> dict:
-    """Calcula umbrales clinicos usando la formula de Tanaka."""
+    """Calcula umbrales clinicos usando la formula de Tanaka o retorna umbrales manuales si existen."""
+    custom = None
+    from src.infrastructure.configuration.settings import settings
+    if settings.STORAGE_BACKEND == "postgres":
+        from src.infrastructure.adapters.output.persistence.postgres_repository import PostgresUserRepository
+        if isinstance(user_repository, PostgresUserRepository):
+            with user_repository._Session() as session:
+                from src.infrastructure.adapters.output.persistence.postgres_repository import ThresholdORM
+                import uuid
+                row = session.query(ThresholdORM).filter(ThresholdORM.patient_id == uuid.UUID(user.id)).first()
+                if row:
+                    custom = {
+                        "bpm_min_normal": row.bpm_min_normal,
+                        "bpm_max_normal": row.bpm_max_normal,
+                        "bpm_min_moderate": row.bpm_min_moderate,
+                        "bpm_max_moderate": row.bpm_max_moderate,
+                        "spo2_min_normal": row.spo2_min_normal,
+                        "spo2_min_moderate": row.spo2_min_moderate,
+                        "spo2_min_critical": row.spo2_min_critical,
+                    }
+    else:
+        if hasattr(user_repository, "_custom_thresholds") and user.id in user_repository._custom_thresholds:
+            custom = user_repository._custom_thresholds[user.id]
+
     edad = user.edad or 30
     peso = user.peso or 70.0
     altura = user.altura or 1.70
@@ -225,6 +306,26 @@ def _calculate_thresholds(user: User) -> dict:
     # IMC y ajuste por obesidad
     imc = peso / (altura ** 2)
     ajuste = 5 if imc > 30 else 0
+
+    if custom:
+        return {
+            "fc_max": round(fc_max),
+            "imc": round(imc, 1),
+            "bpm": {
+                "normal_min": custom["bpm_min_normal"],
+                "normal_max": custom["bpm_max_normal"],
+                "moderate_lo": custom["bpm_min_moderate"],
+                "moderate_hi": custom["bpm_max_moderate"],
+                "critical_lo": 50,
+                "critical_hi": custom["bpm_max_moderate"] + 10,
+            },
+            "spo2": {
+                "normal_min": float(custom["spo2_min_normal"]),
+                "moderate_min": float(custom["spo2_min_moderate"]),
+                "critical_max": float(custom["spo2_min_critical"]),
+            },
+            "is_manual": True
+        }
 
     return {
         "fc_max": round(fc_max),
@@ -242,4 +343,5 @@ def _calculate_thresholds(user: User) -> dict:
             "moderate_min": 90.0,
             "critical_max": 82.0,
         },
+        "is_manual": False
     }

@@ -1,7 +1,4 @@
 // lib/presentation/screens/umbrales_screen.dart
-// Pantalla de Umbrales — calcula automáticamente con fórmula de Tanaka
-// Supervisor puede ver y ajustar valores del paciente seleccionado.
-// Paciente solo ve sus propios umbrales (solo lectura).
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -18,27 +15,53 @@ class UmbralesScreen extends StatefulWidget {
 }
 
 class _UmbralesScreenState extends State<UmbralesScreen> {
-  // Datos de la fórmula
-  int _edad = 30;
-  double _peso = 70.0;
-  double _altura = 1.70;
-  String _sexo = 'Masculino';
+  // Controllers para Biometría
+  final _edadCtrl = TextEditingController();
+  final _pesoCtrl = TextEditingController();
+  final _alturaCtrl = TextEditingController();
 
-  // Umbrales calculados
+  // Controllers para Umbrales Manuales
+  final _bpmMinNormalCtrl = TextEditingController();
+  final _bpmMaxNormalCtrl = TextEditingController();
+  final _bpmMinModerateCtrl = TextEditingController();
+  final _bpmMaxModerateCtrl = TextEditingController();
+  final _spo2MinNormalCtrl = TextEditingController();
+  final _spo2MinModerateCtrl = TextEditingController();
+  final _spo2MinCriticalCtrl = TextEditingController();
+
+  bool _isManual = false;
   Map<String, dynamic>? _thresholds;
   bool _isLoading = true;
   bool _isSaving = false;
   String? _error;
 
-  bool get _isSupervisor => AuthService().currentUser?.role == Role.supervisor;
-
   @override
   void initState() {
     super.initState();
     _fetchThresholds();
+    
+    // Add listeners to auto-calculate Tanaka if user edits biometrics
+    _edadCtrl.addListener(_onBiometricsChanged);
+    _pesoCtrl.addListener(_onBiometricsChanged);
+    _alturaCtrl.addListener(_onBiometricsChanged);
   }
 
-  /// Cálculo local de Tanaka (sin red) para actualización instantánea al mover sliders
+  @override
+  void dispose() {
+    _edadCtrl.dispose();
+    _pesoCtrl.dispose();
+    _alturaCtrl.dispose();
+    _bpmMinNormalCtrl.dispose();
+    _bpmMaxNormalCtrl.dispose();
+    _bpmMinModerateCtrl.dispose();
+    _bpmMaxModerateCtrl.dispose();
+    _spo2MinNormalCtrl.dispose();
+    _spo2MinModerateCtrl.dispose();
+    _spo2MinCriticalCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Cálculo local de Tanaka
   Map<String, dynamic> _tanaka({required int edad, required double peso, required double altura}) {
     final fcMax = 208 - (0.7 * edad);
     final imc = peso / (altura * altura);
@@ -59,6 +82,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
         'moderate_min': 90.0,
         'critical_max': 82.0,
       },
+      'is_manual': false,
     };
   }
 
@@ -66,10 +90,9 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       final auth = AuthService();
-      final pid = widget.patientId;
-      final url = pid != null
-          ? '${auth.baseUrl}/thresholds/$pid'
-          : '${auth.baseUrl}/thresholds';
+      final pid = widget.patientId ?? auth.currentUser?.id;
+      final url = '${auth.baseUrl}/thresholds/$pid';
+      
       final resp = await http.get(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer ${auth.token}'},
@@ -78,56 +101,116 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         setState(() {
           _thresholds = data;
+          _isManual = data['is_manual'] ?? false;
           _isLoading = false;
         });
+
+        // Set biometric fields
+        final u = auth.currentUser;
+        _edadCtrl.text = (u?.edad ?? 30).toString();
+        _pesoCtrl.text = (u?.peso ?? 70.0).toString();
+        _alturaCtrl.text = (u?.altura ?? 1.70).toString();
+
+        _syncControllers(data);
       } else {
-        // Calcular localmente si el endpoint falla
-        setState(() {
-          _thresholds = _tanaka(edad: _edad, peso: _peso, altura: _altura);
-          _isLoading = false;
-        });
+        _loadDefaults();
       }
     } catch (_) {
-      setState(() {
-        _thresholds = _tanaka(edad: _edad, peso: _peso, altura: _altura);
-        _isLoading = false;
-      });
+      _loadDefaults();
     }
   }
 
-  void _recalculate() {
-    setState(() { _thresholds = _tanaka(edad: _edad, peso: _peso, altura: _altura); });
+  void _loadDefaults() {
+    final auth = AuthService();
+    final u = auth.currentUser;
+    final edad = u?.edad ?? 30;
+    final peso = u?.peso ?? 70.0;
+    final altura = u?.altura ?? 1.70;
+
+    _edadCtrl.text = edad.toString();
+    _pesoCtrl.text = peso.toString();
+    _alturaCtrl.text = altura.toString();
+
+    final data = _tanaka(edad: edad, peso: peso, altura: altura);
+    setState(() {
+      _thresholds = data;
+      _isManual = false;
+      _isLoading = false;
+    });
+    _syncControllers(data);
+  }
+
+  void _syncControllers(Map<String, dynamic> data) {
+    final bpm = data['bpm'] as Map<String, dynamic>;
+    final spo2 = data['spo2'] as Map<String, dynamic>;
+
+    _bpmMinNormalCtrl.text = (bpm['normal_min'] ?? 60).toString();
+    _bpmMaxNormalCtrl.text = (bpm['normal_max'] ?? 100).toString();
+    _bpmMinModerateCtrl.text = (bpm['moderate_lo'] ?? 50).toString();
+    _bpmMaxModerateCtrl.text = (bpm['moderate_hi'] ?? 130).toString();
+
+    _spo2MinNormalCtrl.text = (spo2['normal_min'] ?? 95.0).toString();
+    _spo2MinModerateCtrl.text = (spo2['moderate_min'] ?? 90.0).toString();
+    _spo2MinCriticalCtrl.text = (spo2['critical_max'] ?? 82.0).toString();
+  }
+
+  void _onBiometricsChanged() {
+    if (_isManual) return;
+    final edad = int.tryParse(_edadCtrl.text) ?? 30;
+    final peso = double.tryParse(_pesoCtrl.text) ?? 70.0;
+    final altura = double.tryParse(_alturaCtrl.text) ?? 1.70;
+
+    final tanakaData = _tanaka(edad: edad, peso: peso, altura: altura);
+    setState(() {
+      _thresholds = tanakaData;
+    });
+    _syncControllers(tanakaData);
   }
 
   Future<void> _saveThresholds() async {
-    if (widget.patientId == null) return;
     setState(() => _isSaving = true);
     try {
       final auth = AuthService();
-      final url = '${auth.baseUrl.replaceAll('/auth', '')}/auth/thresholds/${widget.patientId}';
+      final pid = widget.patientId ?? auth.currentUser?.id;
+      final url = '${auth.baseUrl}/thresholds/$pid';
+
+      final body = <String, dynamic>{
+        'edad': int.tryParse(_edadCtrl.text) ?? 30,
+        'peso': double.tryParse(_pesoCtrl.text) ?? 70.0,
+        'altura': double.tryParse(_alturaCtrl.text) ?? 1.70,
+        'is_manual': _isManual,
+      };
+
+      if (_isManual) {
+        body['bpm_min_normal'] = int.tryParse(_bpmMinNormalCtrl.text) ?? 60;
+        body['bpm_max_normal'] = int.tryParse(_bpmMaxNormalCtrl.text) ?? 100;
+        body['bpm_min_moderate'] = int.tryParse(_bpmMinModerateCtrl.text) ?? 50;
+        body['bpm_max_moderate'] = int.tryParse(_bpmMaxModerateCtrl.text) ?? 130;
+        body['spo2_min_normal'] = double.tryParse(_spo2MinNormalCtrl.text) ?? 95.0;
+        body['spo2_min_moderate'] = double.tryParse(_spo2MinModerateCtrl.text) ?? 90.0;
+        body['spo2_min_critical'] = double.tryParse(_spo2MinCriticalCtrl.text) ?? 82.0;
+      }
+
       final resp = await http.put(
         Uri.parse(url),
         headers: {
           'Authorization': 'Bearer ${auth.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'edad': _edad,
-          'peso': _peso,
-          'altura': _altura,
-        }),
+        body: jsonEncode(body),
       );
 
       if (resp.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Umbrales guardados correctamente'), backgroundColor: Color(0xFF10B981)),
+            const SnackBar(content: Text('✅ Cambios guardados correctamente'), backgroundColor: Color(0xFF10B981)),
           );
         }
+        _fetchThresholds();
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Error al guardar umbrales'), backgroundColor: Color(0xFFDC2626)),
+            const SnackBar(content: Text('❌ Error al guardar en el servidor'), backgroundColor: Color(0xFFDC2626)),
           );
         }
       }
@@ -144,180 +227,278 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))));
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0E1A),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
+      );
+    }
 
-    final bpm = _thresholds!['bpm'] as Map<String, dynamic>;
-    final spo2 = _thresholds!['spo2'] as Map<String, dynamic>;
     final imc = (_thresholds!['imc'] as num).toDouble();
     final fcMax = _thresholds!['fc_max'] as int;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D4ED8),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Row(
           children: [
-            Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+            Icon(Icons.tune_rounded, color: Colors.white, size: 22),
             SizedBox(width: 8),
-            Text('Umbrales Clínicos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('Umbrales Clínicos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
-          // Banner informativo para paciente
-          if (!_isSupervisor)
-            _infoCard('Solo tu Supervisor puede ajustar estos parámetros. Son calculados a partir de tus datos biométricos.'),
+          // Banner Informativo
+          _infoCard('Personalice la biometría y active el modo manual si requiere configurar límites fijos.'),
 
-          // === Parámetros biométricos (solo editable por supervisor) ===
-          _sectionTitle('Parámetros del Paciente'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  _sliderRow('Edad', '$_edad años', _edad.toDouble(), 10, 100, _isSupervisor,
-                    (v) { _edad = v.round(); _recalculate(); }),
-                  const Divider(height: 1),
-                  _sliderRow('Peso', '${_peso.toStringAsFixed(1)} kg', _peso, 30, 200, _isSupervisor,
-                    (v) { _peso = v; _recalculate(); }),
-                  const Divider(height: 1),
-                  _sliderRow('Altura', '${_altura.toStringAsFixed(2)} m', _altura, 1.0, 2.5, _isSupervisor,
-                    (v) { _altura = v; _recalculate(); }),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-          // IMC calculado
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: imc > 30 ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
+          _sectionTitle('Perfil Biométrico'),
+          _buildCard(
+            child: Column(
               children: [
-                Icon(imc > 30 ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
-                    color: imc > 30 ? const Color(0xFFF59E0B) : const Color(0xFF10B981), size: 18),
-                const SizedBox(width: 8),
-                Text('IMC: $imc  |  FC Máx: $fcMax BPM  |  ${imc > 30 ? "Ajuste por obesidad aplicado (+5 BPM)" : "Peso normal"}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF374151))),
+                _buildInputField('Edad', _edadCtrl, 'Años', Icons.cake),
+                const SizedBox(height: 12),
+                _buildInputField('Peso', _pesoCtrl, 'kg', Icons.monitor_weight),
+                const SizedBox(height: 12),
+                _buildInputField('Altura', _alturaCtrl, 'm', Icons.height),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
-          // === Umbrales calculados ===
-          _sectionTitle('Umbrales Calculados Automáticamente'),
-          _thresholdCard(
-            color: const Color(0xFF10B981),
-            icon: Icons.check_circle_rounded,
-            label: 'Normal',
-            lines: ['BPM: ${bpm['normal_min']} – ${bpm['normal_max']}', 'SpO₂: ≥ ${spo2['normal_min']}%'],
-          ),
-          const SizedBox(height: 8),
-          _thresholdCard(
-            color: const Color(0xFFF59E0B),
-            icon: Icons.warning_rounded,
-            label: 'Moderado',
-            lines: ['BPM: ${bpm['moderate_lo']} – ${bpm['moderate_hi']}', 'SpO₂: ${spo2['moderate_min']}% – ${spo2['normal_min']}%'],
-          ),
-          const SizedBox(height: 8),
-          _thresholdCard(
-            color: const Color(0xFFDC2626),
-            icon: Icons.dangerous_rounded,
-            label: 'Crítico',
-            lines: ['BPM: < ${bpm['critical_lo']} o > ${bpm['critical_hi']}', 'SpO₂: < ${spo2['critical_max']}%'],
+          const SizedBox(height: 12),
+          // IMC / FC Max Info
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: imc > 30 ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFF064E3B).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: imc > 30 ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFF10B981).withOpacity(0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(imc > 30 ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
+                    color: imc > 30 ? const Color(0xFFF59E0B) : const Color(0xFF10B981), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'IMC: $imc  |  FC Máx: $fcMax BPM\n${imc > 30 ? "Ajuste por obesidad aplicado (+5 BPM)" : "Biometría normal"}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 24),
-          if (_isSupervisor)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _saveThresholds,
-                icon: _isSaving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save_rounded, color: Colors.white),
-                label: Text(_isSaving ? 'Guardando...' : 'Guardar Umbrales',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          // Modo Manual Toggle Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Modo Manual de Umbrales', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              Switch(
+                value: _isManual,
+                activeColor: const Color(0xFF2563EB),
+                onChanged: (val) {
+                  setState(() {
+                    _isManual = val;
+                  });
+                  _onBiometricsChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (_isManual) ...[
+            _sectionTitle('Configuración Manual de Límites'),
+            _buildCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Frecuencia Cardíaca (BPM)', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _buildManualField('Mín. Normal', _bpmMinNormalCtrl)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildManualField('Máx. Normal', _bpmMaxNormalCtrl)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildManualField('Mín. Moderado', _bpmMinModerateCtrl)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildManualField('Máx. Moderado', _bpmMaxModerateCtrl)),
+                    ],
+                  ),
+                  const Divider(color: Colors.white24, height: 24),
+                  const Text('Oxígeno (SpO₂ %)', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _buildManualField('Mín. Normal', _spo2MinNormalCtrl)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildManualField('Mín. Moderado', _spo2MinModerateCtrl)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildManualField('Mín. Crítico', _spo2MinCriticalCtrl)),
+                    ],
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: 20),
+          ] else ...[
+            _sectionTitle('Umbrales Calculados (Solo Lectura)'),
+            _thresholdInfoRow('Normal', const Color(0xFF10B981), 'BPM: ${_bpmMinNormalCtrl.text} – ${_bpmMaxNormalCtrl.text}', 'SpO₂: ≥ ${_spo2MinNormalCtrl.text}%'),
+            const SizedBox(height: 10),
+            _thresholdInfoRow('Moderado', const Color(0xFFF59E0B), 'BPM: ${_bpmMinModerateCtrl.text} – ${_bpmMaxModerateCtrl.text}', 'SpO₂: ${_spo2MinModerateCtrl.text}% – ${_spo2MinNormalCtrl.text}%'),
+            const SizedBox(height: 10),
+            _thresholdInfoRow('Crítico', const Color(0xFFDC2626), 'BPM: < ${_bpmMinModerateCtrl.text} o > ${_bpmMaxModerateCtrl.text}', 'SpO₂: < ${_spo2MinCriticalCtrl.text}%'),
+          ],
+
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: _isSaving ? null : _saveThresholds,
+              icon: _isSaving
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.save_rounded, color: Colors.white),
+              label: Text(_isSaving ? 'Guardando...' : 'Guardar Umbrales', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _sectionTitle(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF374151))),
-  );
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+    );
+  }
 
-  Widget _infoCard(String msg) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFEF3C7),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
-    ),
-    child: Row(
+  Widget _buildCard({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildInputField(String label, TextEditingController controller, String suffix, IconData icon) {
+    return Row(
       children: [
-        const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
-        const SizedBox(width: 8),
-        Expanded(child: Text(msg, style: const TextStyle(color: Color(0xFF92400E), fontSize: 12))),
+        Icon(icon, color: Colors.white54, size: 20),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        const Spacer(),
+        SizedBox(
+          width: 90,
+          height: 40,
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              suffixText: ' $suffix',
+              suffixStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              filled: true,
+              fillColor: const Color(0xFF0A0E1A),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
       ],
-    ),
-  );
+    );
+  }
 
-  Widget _thresholdCard({required Color color, required IconData icon, required String label, required List<String> lines}) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: color.withOpacity(0.12),
-          child: Icon(icon, color: color, size: 20),
+  Widget _buildManualField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 40,
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              filled: true,
+              fillColor: const Color(0xFF0A0E1A),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+          ),
         ),
-        title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: lines.map((l) => Text(l, style: const TextStyle(fontSize: 12, color: Color(0xFF374151)))).toList(),
-        ),
+      ],
+    );
+  }
+
+  Widget _thresholdInfoRow(String label, Color color, String bpmRange, String spo2Range) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: color.withOpacity(0.2),
+            child: Icon(Icons.circle, color: color, size: 8),
+          ),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(bpmRange, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 2),
+              Text(spo2Range, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _sliderRow(String label, String valueStr, double value, double min, double max, bool enabled, ValueChanged<double> onChanged) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _infoCard(String msg) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF374151))),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFF2563EB).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: Text(valueStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))),
-              ),
-              if (!enabled) const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.lock_outline, size: 14, color: Color(0xFFD1D5DB))),
-            ],
-          ),
-          if (enabled)
-            Slider(
-              value: value,
-              min: min,
-              max: max,
-              activeColor: const Color(0xFF2563EB),
-              inactiveColor: const Color(0xFFE5E7EB),
-              onChanged: enabled ? (v) => setState(() => onChanged(v)) : null,
-            ),
+          const Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(msg, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4))),
         ],
       ),
     );

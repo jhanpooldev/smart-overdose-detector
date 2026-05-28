@@ -1,5 +1,4 @@
 // lib/presentation/screens/device_screen.dart
-// Pantalla 4 (📶) — Estado del Dispositivo (Wearable + conexión)
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -20,7 +19,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   void initState() {
     super.initState();
-    // Simula tiempo desde última sincronización
     _syncTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() => _secondsSinceSync++);
     });
@@ -41,53 +39,57 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D4ED8),
-        title: Row(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.wifi_rounded, size: 18, color: Colors.white),
+          children: [
+            Icon(Icons.wifi_rounded, size: 20, color: Colors.white),
             SizedBox(width: 8),
-            Text('Estado del Dispositivo', style: TextStyle(fontSize: 16)),
+            Text('Estado del Dispositivo', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  _statusRow(
-                    icon: Icons.watch_rounded,
-                    label: 'Wearable',
-                    value: _connected ? 'Conectado' : 'Desconectado',
-                    valueColor: _connected ? const Color(0xFF10B981) : const Color(0xFFDC2626),
-                    checkIcon: _connected,
-                  ),
-                  const Divider(height: 1),
-                  _statusRow(
-                    icon: Icons.bluetooth_rounded,
-                    label: 'Bluetooth',
-                    value: _bluetoothActive ? 'Activo' : 'Inactivo',
-                    valueColor: _bluetoothActive ? const Color(0xFF2563EB) : const Color(0xFF9CA3AF),
-                    checkIcon: _bluetoothActive,
-                  ),
-                  const Divider(height: 1),
-                  _batteryRow(),
-                  const Divider(height: 1),
-                  _statusRow(
-                    icon: Icons.sync_rounded,
-                    label: 'Última sincronización:',
-                    value: _syncLabel(),
-                    valueColor: const Color(0xFF6B7280),
-                    checkIcon: null,
-                  ),
-                ],
-              ),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131929),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: Column(
+              children: [
+                _statusRow(
+                  icon: Icons.watch_rounded,
+                  label: 'Wearable',
+                  value: _connected ? 'Conectado' : 'Desconectado',
+                  valueColor: _connected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  checkIcon: _connected,
+                ),
+                const Divider(color: Colors.white12, height: 1),
+                _statusRow(
+                  icon: Icons.bluetooth_rounded,
+                  label: 'Bluetooth',
+                  value: _bluetoothActive ? 'Activo' : 'Inactivo',
+                  valueColor: _bluetoothActive ? const Color(0xFF2563EB) : Colors.white38,
+                  checkIcon: _bluetoothActive,
+                ),
+                const Divider(color: Colors.white12, height: 1),
+                _batteryRow(),
+                const Divider(color: Colors.white12, height: 1),
+                _statusRow(
+                  icon: Icons.sync_rounded,
+                  label: 'Última sincronización',
+                  value: _syncLabel(),
+                  valueColor: Colors.white70,
+                  checkIcon: null,
+                ),
+              ],
             ),
           ),
 
@@ -105,9 +107,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Reconectar', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: const Text('Reconectar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -116,42 +120,48 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   onPressed: () {
                     setState(() { _connected = false; _bluetoothActive = false; });
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Conexión detenida'), backgroundColor: Color(0xFFDC2626)),
+                      const SnackBar(content: Text('Conexión detenida'), backgroundColor: Color(0xFFEF4444)),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Parar Conexión', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: const Text('Parar Conexión', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          // Contactos de emergencia (misma pantalla que el mockup de contacto)
-          const Text('Contactos de Emergencia', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
-          const SizedBox(height: 8),
-          Card(
+          const Text('Contactos de Emergencia', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF131929),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
             child: Column(
               children: [
                 _contactTile('Juan Pérez', '555-123-4567'),
-                const Divider(height: 1),
+                const Divider(color: Colors.white12, height: 1),
                 _contactTile('Ana López', '555-997-6543'),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () {},
-            icon: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB)),
-            label: const Text('Agregar Contacto', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 18),
+            label: const Text('Agregar Contacto', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 14)),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFF2563EB)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -161,14 +171,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Widget _statusRow({required IconData icon, required String label, required String value, required Color valueColor, required bool? checkIcon}) {
     return ListTile(
-      leading: Icon(icon, color: valueColor, size: 22),
-      title: Text(label, style: const TextStyle(color: Color(0xFF374151), fontSize: 14)),
+      leading: Icon(icon, color: valueColor, size: 20),
+      title: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (checkIcon == true) const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
-          if (checkIcon == false) const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 16),
-          const SizedBox(width: 4),
+          if (checkIcon == false) const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 16),
+          const SizedBox(width: 6),
           Text(value, style: TextStyle(color: valueColor, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
@@ -176,23 +186,26 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget _batteryRow() {
-    final color = _battery > 50 ? const Color(0xFF10B981) : _battery > 20 ? const Color(0xFFF59E0B) : const Color(0xFFDC2626);
+    final color = _battery > 50 ? const Color(0xFF10B981) : _battery > 20 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444);
     return ListTile(
-      leading: Icon(Icons.battery_charging_full_rounded, color: color, size: 22),
-      title: const Text('Batería', style: TextStyle(color: Color(0xFF374151), fontSize: 14)),
+      leading: Icon(Icons.battery_charging_full_rounded, color: color, size: 20),
+      title: const Text('Batería', style: TextStyle(color: Colors.white70, fontSize: 14)),
       trailing: Text('$_battery%', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
     );
   }
 
   Widget _contactTile(String name, String number) {
     return ListTile(
-      leading: const CircleAvatar(
-        backgroundColor: Color(0xFFE0E7FF),
-        child: Icon(Icons.person_outline, color: Color(0xFF2563EB), size: 18),
+      leading: CircleAvatar(
+        backgroundColor: const Color(0xFF2563EB).withOpacity(0.12),
+        child: const Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 18),
       ),
-      title: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1F2937))),
-      subtitle: Text(number, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-      trailing: Icon(Icons.close_rounded, color: Colors.red.shade300, size: 18),
+      title: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+      subtitle: Text(number, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+      trailing: IconButton(
+        icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+        onPressed: () {},
+      ),
     );
   }
 }
