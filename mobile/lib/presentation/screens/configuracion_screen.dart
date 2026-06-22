@@ -2,6 +2,7 @@
 // Pantalla de configuración — umbrales clínicos y datos del paciente.
 
 import 'package:flutter/material.dart';
+import '../../infrastructure/telemetry/telemetry_service.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -15,6 +16,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   double _bpmMinThreshold = 50.0;
   bool _notifyOnModerate = false;
   bool _highContrastMode = false;
+  double _exceptionSliderValue = TelemetryService().exceptionsActive ? 1.0 : 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +50,41 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             70.0,
             (v) => setState(() => _bpmMinThreshold = v),
             const Color(0xFFEC4899),
+          ),
+          const SizedBox(height: 16),
+
+          _sectionTitle('🛡️ Actividades Excepcionales'),
+          _sliderTile(
+            'Actividad excepcional (Evitar detección inmovilidad)',
+            _exceptionSliderValue == 1.0 ? 'ACTIVADO' : 'DESACTIVADO',
+            _exceptionSliderValue,
+            0.0,
+            1.0,
+            (v) {
+              final target = v.roundToDouble();
+              if (target != _exceptionSliderValue) {
+                setState(() {
+                  _exceptionSliderValue = target;
+                });
+                final active = target == 1.0;
+                TelemetryService().exceptionsActive = active;
+
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      active
+                          ? 'actividad excepcional activada'
+                          : 'actividad excepcional desactivada',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: active ? const Color(0xFF8B5CF6) : const Color(0xFF6B7280),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            const Color(0xFF8B5CF6),
           ),
           const SizedBox(height: 16),
 

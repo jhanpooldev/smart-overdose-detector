@@ -8,6 +8,7 @@ import 'alerta_screen.dart';
 import 'umbrales_screen.dart';
 import 'contacts_screen.dart';
 import 'device_screen.dart';
+import 'historial_screen.dart';
 import 'login_screen.dart';
 
 final GlobalKey<_HomeShellState> homeShellKey = GlobalKey<_HomeShellState>();
@@ -29,19 +30,21 @@ class _HomeShellState extends State<HomeShell> {
   List<Widget> get _screens {
     final isSup = AuthService().currentUser?.role == Role.supervisor;
     if (isSup) {
-      // Supervisor: Pacientes | Alertas | Ajustes
+      // Supervisor: Pacientes | Alertas | Historial | Umbrales
       return [
         const SupervisorDashboardScreen(),
         const AlertaScreen(),
-        const UmbralesScreen(),
+        const HistorialScreen(),        // historial propio/general
+        const UmbralesScreen(),         // sin paciente fijo → muestra selector
       ];
     }
-    // Paciente: Monitor | Alertas | Contactos | Dispositivo | Ajustes
+    // Paciente: Monitor | Alertas | Contactos | Dispositivo | Historial | Ajustes
     return [
       const MonitorScreenV2(),
       const AlertaScreen(),
       const ContactsScreen(),
       const DeviceScreen(),
+      const HistorialScreen(),
       const UmbralesScreen(),
     ];
   }
@@ -69,22 +72,23 @@ class _HomeShellState extends State<HomeShell> {
         child: SafeArea(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Monitor (paciente) / Pacientes (supervisor)
-              _navItem(0,
-                  isSup ? Icons.supervisor_account_rounded : Icons.favorite_rounded,
-                  isSup ? 'Pacientes' : 'Monitor'),
-              // Alertas
-              _navItem(1, Icons.warning_rounded, 'Alertas'),
-              // Contactos (solo paciente)
-              if (!isSup) _navItem(2, Icons.people_rounded, 'Contactos'),
-              // Dispositivo (solo paciente) — RF08
-              if (!isSup) _navItem(3, Icons.watch_rounded, 'Dispositivo'),
-              // Ajustes
-              _navItem(isSup ? 2 : 4, Icons.settings_rounded, 'Ajustes'),
-              // Logout
-              _logoutButton(),
-            ],
+            children: isSup
+                ? [
+                    _navItem(0, Icons.supervisor_account_rounded, 'Pacientes'),
+                    _navItem(1, Icons.warning_rounded, 'Alertas'),
+                    _navItem(2, Icons.history_rounded, 'Historial'),
+                    _navItem(3, Icons.settings_rounded, 'Ajustes'),
+                    _logoutButton(),
+                  ]
+                : [
+                    _navItem(0, Icons.favorite_rounded, 'Monitor'),
+                    _navItem(1, Icons.warning_rounded, 'Alertas'),
+                    _navItem(2, Icons.people_rounded, 'Contactos'),
+                    _navItem(3, Icons.watch_rounded, 'Dispositivo'),
+                    _navItem(4, Icons.history_rounded, 'Historial'),
+                    _navItem(5, Icons.settings_rounded, 'Ajustes'),
+                    _logoutButton(),
+                  ],
           ),
         ),
       ),

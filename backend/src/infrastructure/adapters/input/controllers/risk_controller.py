@@ -71,7 +71,7 @@ async def get_history(
 ):
     """Retorna el historial de lecturas biométricas de un paciente."""
     from src.infrastructure.configuration.container import signal_repository
-    readings = signal_repository.get_history(patient_id, limit)
+    readings = await signal_repository.get_history(patient_id, limit)
     return [
         {
             "spo2": r.spo2,
@@ -155,11 +155,10 @@ async def save_reading(payload: BiometricReadingPayload, current_user: User = De
 @router.get("/readings/{patient_id}/latest", tags=["Remote Monitor"])
 async def get_latest_reading(patient_id: str, current_user: User = Depends(get_current_user)):
     from src.infrastructure.configuration.container import signal_repository
-    readings = signal_repository.get_history(patient_id, 1)
+    readings = await signal_repository.get_history(patient_id, 1)
     if not readings:
         raise HTTPException(status_code=404, detail="No readings found")
     r = readings[0]
-    from src.domain.entities.risk_prediction import RiskLevel
     # Basic classification just for the endpoint response convenience
     risk = "normal"
     if r.spo2 < 82 or r.bpm < 50:

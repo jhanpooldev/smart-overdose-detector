@@ -78,15 +78,19 @@ class TelemetryService {
   final SimulatedSensorAdapter _sensor = SimulatedSensorAdapter();
   StreamSubscription? _sensorSub;
 
+  // Bandera de excepciones para desactivar el monitoreo de inmovilidad
+  bool exceptionsActive = false;
+
   void startSimulation() async {
     isSimulated = true;
     _sensorSub?.cancel();
     try { await startSession(); } catch (_) {}
     _sensorSub = _sensor.biometricStream.listen((raw) {
       sendReading(
-        heartRate: raw.bpm as int,
-        spo2: (raw.spo2 as double).round(),
+        heartRate: raw.bpm,
+        spo2: raw.spo2.round(),
         statusMovement: raw.activity == 1 ? 'WALKING' : 'STILL',
+        mobility: raw.mobility,
       );
     });
   }
@@ -125,6 +129,7 @@ class TelemetryService {
     int? respRate,
     String statusMovement = 'UNKNOWN',
     DateTime? recordedAt,
+    double? mobility,
   }) async {
     if (_currentSession == null) {
       debugPrint('⚠️ TelemetryService: Sin sesión activa. Llama a startSession() primero.');
@@ -142,16 +147,21 @@ class TelemetryService {
         recordedAt:     recordedAt ?? DateTime.now().toUtc(),
       );
 
+      // Integrar la movilidad a la respuesta final
+      final finalResult = result.copyWith(
+        mobility: mobility ?? (statusMovement == 'WALKING' ? 75.0 : 5.0),
+      );
+
       // Publicar señal procesada en el stream de la UI
       if (!_isDisposed) {
-        _signalController.add(result);
+        _signalController.add(finalResult);
       }
 
       if (_state != StreamConnectionState.connected) {
         _setConnectionState(StreamConnectionState.connected);
       }
 
-      return result;
+      return finalResult;
     } on ApiException catch (e) {
       if (e.statusCode == 400 || e.statusCode == 401) {
         // Token inválido → reiniciar sesión

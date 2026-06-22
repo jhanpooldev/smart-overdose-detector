@@ -260,11 +260,41 @@ async def get_signal_history(
 ) -> List[SignalHistoryResponse]:
     """
     Retorna historial de señales filtrado por rango de timestamps (RF13).
-    Incluye sugerencias clínicas en los eventos de riesgo basadas en media móvil.
+
+    RBAC:
+      - Paciente: solo puede consultar su propio historial.
+      - Supervisor: solo puede consultar pacientes que le estén asignados.
     """
-    signals = await biometric_signal_repository.get_history(
-        patient_id, limit=limit, from_ts=from_ts, to_ts=to_ts
-    )
+    # ── RBAC ─────────────────────────────────────────────────────────────────
+    if current_user.role == Role.PACIENTE and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para acceder al historial de otro paciente",
+        )
+
+    if current_user.role == Role.SUPERVISOR:
+        # Verificar que el paciente solicitado pertenece a este supervisor
+        target = await patient_repository_v2.get_by_id(patient_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        if getattr(target, "supervisor_email", None) != current_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Este paciente no está asignado a tu cuenta de supervisor",
+            )
+    # ─────────────────────────────────────────────────────────────────────────
+
+    try:
+        signals = await biometric_signal_repository.get_history(
+            patient_id, limit=limit, from_ts=from_ts, to_ts=to_ts
+        )
+    except Exception as exc:
+        logger.exception("Error al obtener historial del paciente %s: %s", patient_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo obtener el historial. Intente más tarde.",
+        )
+
     return [
         SignalHistoryResponse(
             time=s.time,
@@ -275,3 +305,4 @@ async def get_signal_history(
         )
         for s in signals
     ]
+

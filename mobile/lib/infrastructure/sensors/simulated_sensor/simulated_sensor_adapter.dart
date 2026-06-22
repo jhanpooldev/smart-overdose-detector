@@ -55,6 +55,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
     double spo2;
     int bpm;
     int activity;
+    double mobility;
 
     switch (scenario) {
       case ScenarioType.normal:
@@ -63,6 +64,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
         // BPM: 60 - 100
         bpm = 60 + _random.nextInt(41);
         activity = 1;
+        mobility = 60.0 + _random.nextDouble() * 35.0;
         break;
       case ScenarioType.moderate:
         // SpO2: 90 - 94.9
@@ -70,6 +72,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
         // BPM: 50 - 60
         bpm = 50 + _random.nextInt(11);
         activity = _random.nextBool() ? 1 : 0;
+        mobility = 15.0 + _random.nextDouble() * 30.0;
         break;
       case ScenarioType.critical:
         // SpO2: 70 - 81.9
@@ -77,6 +80,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
         // BPM: 30 - 49
         bpm = 30 + _random.nextInt(20);
         activity = 0;
+        mobility = _random.nextDouble() * 10.0;
         break;
     }
 
@@ -84,6 +88,7 @@ class SimulatedSensorAdapter implements ISensorAdapter {
       spo2: double.parse(spo2.toStringAsFixed(1)),
       bpm: bpm,
       activity: activity,
+      mobility: double.parse(mobility.toStringAsFixed(1)),
       timestamp: now,
     );
   }

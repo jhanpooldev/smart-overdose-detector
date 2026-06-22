@@ -63,6 +63,7 @@ class BiometricSignalResponse {
   final bool             alertTriggered;
   final String           streamStatus;
   final String?          patientId;
+  final double           mobility; // Porcentaje de movilidad (0.0 - 100.0)
 
   const BiometricSignalResponse({
     required this.time,
@@ -74,6 +75,7 @@ class BiometricSignalResponse {
     required this.alertTriggered,
     required this.streamStatus,
     this.patientId,
+    required this.mobility,
   });
 
   factory BiometricSignalResponse.fromJson(Map<String, dynamic> json) {
@@ -87,6 +89,7 @@ class BiometricSignalResponse {
       alertTriggered: (json['alert_triggered'] ?? false) as bool,
       streamStatus:  (json['stream_status'] ?? 'DISCONNECTED') as String,
       patientId:     json['patient_id'] as String?,
+      mobility:      (json['mobility'] ?? (json['status_movement'] == 'WALKING' ? 75.0 : (json['status_movement'] == 'RUNNING' ? 95.0 : 5.0))).toDouble(),
     );
   }
 
@@ -109,7 +112,7 @@ class BiometricSignalResponse {
     return '✓ Parámetros dentro del rango normal';
   }
 
-  BiometricSignalResponse copyWith({RiskLevelV2? riskLevel}) => BiometricSignalResponse(
+  BiometricSignalResponse copyWith({RiskLevelV2? riskLevel, double? mobility}) => BiometricSignalResponse(
     time:           time,
     heartRate:      heartRate,
     spo2:           spo2,
@@ -119,5 +122,6 @@ class BiometricSignalResponse {
     alertTriggered: alertTriggered,
     streamStatus:   streamStatus,
     patientId:      patientId,
+    mobility:       mobility ?? this.mobility,
   );
 }
