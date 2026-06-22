@@ -50,26 +50,23 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 @router.post("/login", response_model=TokenResponse)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Valida credenciales y genera un Token JWT."""
+    # Anti-enumeración: mismo mensaje genérico para usuario inexistente
+    # o contraseña incorrecta (evita revelar si el email existe).
+    _INVALID_MSG = "Credenciales inválidas"
+
     user = user_repository.get_by_email(form_data.username)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no registrado",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not auth_service.verify_password(form_data.password, user.hashed_password):
+    if not user or not auth_service.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Contraseña incorrecta",
+            detail=_INVALID_MSG,
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Crear token
+
     token = auth_service.create_access_token(data={"sub": user.email, "role": str(user.role.value)})
     return TokenResponse(
-        access_token=token, 
-        role=user.role.value, 
-        email=user.email, 
+        access_token=token,
+        role=user.role.value,
+        email=user.email,
         id=user.id,
         supervisor_email=user.supervisor_email
     )
@@ -77,6 +74,16 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.post("/register", response_model=TokenResponse)
 async def register(req: RegisterRequest):
     """Crea una nueva cuenta de usuario."""
+    # Validación de complejidad de contraseña
+    import re
+    pwd = req.password
+    if len(pwd) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    if not re.search(r'[A-Z]', pwd):
+        raise HTTPException(status_code=400, detail="La contraseña debe contener al menos una mayúscula")
+    if not re.search(r'[0-9]', pwd):
+        raise HTTPException(status_code=400, detail="La contraseña debe contener al menos un número")
+
     if user_repository.get_by_email(req.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -103,9 +103,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   AppBar _buildAppBar() {
     final user = AuthService().currentUser;
-    final isDoctor = user?.role == Role.doctor;
-    final roleLabel = user?.role.name.toUpperCase() ?? 'PACIENTE';
-    
+    final isSupervisor = user?.role == Role.supervisor;
+    final roleLabel = isSupervisor ? 'SUPERVISOR' : 'PACIENTE';
+
     return AppBar(
       backgroundColor: const Color(0xFF0D1220),
       elevation: 0,
@@ -128,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       actions: [
-        if (isDoctor)
+        if (isSupervisor)
           PopupMenuButton<ScenarioType>(
             icon: const Icon(Icons.tune, color: Color(0xFF60A5FA)),
             tooltip: 'Cambiar escenario',

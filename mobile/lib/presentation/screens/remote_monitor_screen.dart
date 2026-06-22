@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../infrastructure/auth/auth_service.dart';
-import 'detail_status_screen.dart';
+import 'historial_screen.dart';
 import 'umbrales_screen.dart';
 
 class RemoteMonitorScreen extends StatefulWidget {
@@ -80,8 +80,6 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCritical = _reading != null && _reading!['risk_level'] == 'critical';
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
@@ -100,6 +98,21 @@ class _RemoteMonitorScreenState extends State<RemoteMonitorScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: Colors.white),
+            tooltip: 'Ver Historial',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HistorialScreen(
+                    patientId: widget.patientId,
+                    patientLabel: widget.patientEmail,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.tune_rounded, color: Colors.white),
             tooltip: 'Ajustar Umbrales',

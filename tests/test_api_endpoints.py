@@ -84,24 +84,26 @@ class TestRegisterAndLogin:
         assert "access_token" in r.json()
 
     async def test_login_wrong_password(self, app, supervisor_credentials):
-        """Contraseña incorrecta retorna 401."""
+        """Contraseña incorrecta retorna 401 con mensaje genérico (anti-enumeración)."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/v1/auth/login", data={
                 "username": supervisor_credentials["email"],
                 "password": "wrongpass",
             })
         assert r.status_code == 401
-        assert r.json()["detail"] == "Contraseña incorrecta"
+        # Anti-enumeración: mensaje genérico igual para contraseña incorrecta
+        assert r.json()["detail"] == "Credenciales inválidas"
 
     async def test_login_nonexistent_user(self, app):
-        """Usuario no registrado retorna 404."""
+        """Usuario no registrado retorna 401 con mensaje genérico (anti-enumeración)."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/v1/auth/login", data={
                 "username": "noexiste@sod.com",
                 "password": "cualquiera",
             })
-        assert r.status_code == 404
-        assert r.json()["detail"] == "Usuario no registrado"
+        assert r.status_code == 401
+        # Anti-enumeración: mismo mensaje genérico, no revela si el email existe
+        assert r.json()["detail"] == "Credenciales inválidas"
 
 
 @pytest.mark.asyncio

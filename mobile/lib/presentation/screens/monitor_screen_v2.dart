@@ -56,6 +56,11 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
   bool _smsSent    = false;
   Timer? _alertReset;
 
+  // ── Verificación de riesgo (PMV3) ──────────────────────────────────────────
+  bool _isVerificationDialogShowing = false;
+  int _verificationCountdown = 5;
+  Timer? _verificationTimer;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +80,7 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       Permission.notification,
       Permission.phone,
       Permission.sms,
+      Permission.location, // Ubicación para HU-005
     ].request();
   }
 
@@ -104,8 +110,13 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       }
     });
 
-    if (signal.riskLevel == RiskLevelV2.critical) {
-      _handleCriticalAlert(signal);
+    // Detectar situación de riesgo (valores vitales críticos, o inmovilidad < 15% sin excepción activa)
+    final isExceptionActive = _telemetry.exceptionsActive;
+    final isCriticalMobility = signal.mobility < 15.0 && !isExceptionActive;
+    final isCriticalVitals = signal.riskLevel == RiskLevelV2.critical;
+
+    if (isCriticalMobility || isCriticalVitals) {
+      _triggerVerificationFlow(signal);
     } else {
       _resetAlertFlags();
     }
@@ -149,8 +160,12 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
         }
       });
 
-      if (latest.riskLevel == RiskLevelV2.critical && isRecent) {
-        _handleCriticalAlert(latest);
+      final isExceptionActive = _telemetry.exceptionsActive;
+      final isCriticalMobility = latest.mobility < 15.0 && !isExceptionActive;
+      final isCriticalVitals = latest.riskLevel == RiskLevelV2.critical;
+
+      if ((isCriticalMobility || isCriticalVitals) && isRecent) {
+        _triggerVerificationFlow(latest);
       } else {
         _resetAlertFlags();
       }
@@ -288,17 +303,24 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
 
   Widget _buildConnectionBar() {
     Color color = _isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
-    String label = _isConnected ? '● Transmitiendo en tiempo real' : '○ Esperando dispositivo...';
+    String label = _isConnected ? 'Transmitiendo en tiempo real' : 'Esperando conexión';
 
     return Container(
       color: color.withOpacity(0.12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          Icon(
-            _isConnected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-            color: color, size: 14,
-          ),
+          if (_isConnected)
+            Icon(Icons.cloud_done_rounded, color: color, size: 14)
+          else
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: Color(0xFFF59E0B),
+              ),
+            ),
           const SizedBox(width: 8),
           Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
         ],
@@ -348,6 +370,10 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // ── Tarjeta de inmovilidad (PMV3) ──────────────────────────────────
+        _buildMobilityCard(),
+        const SizedBox(height: 16),
+
         // ── Métricas principales ─────────────────────────────────────────
         _buildMetricRow(),
         const SizedBox(height: 20),
@@ -595,6 +621,327 @@ class _MonitorScreenV2State extends State<MonitorScreenV2>
       ],
     ),
   );
+
+  Widget _buildMobilityCard() {
+    if (_latest == null) return const SizedBox.shrink();
+
+    final mobility = _latest!.mobility;
+    final isExceptionActive = _telemetry.exceptionsActive;
+
+    // Calcular estado y color según HU-002
+    String status = 'Normal';
+    Color statusColor = const Color(0xFF10B981); // Verde
+
+    if (mobility < 15.0) {
+      status = 'Riesgo crítico';
+      statusColor = const Color(0xFFEF4444); // Rojo
+    } else if (mobility < 50.0) {
+      status = 'Moderado';
+      statusColor = const Color(0xFFF59E0B); // Amarillo
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1220),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isExceptionActive ? const Color(0xFF8B5CF6).withOpacity(0.4) : statusColor.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isExceptionActive ? const Color(0xFF8B5CF6) : statusColor).withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isExceptionActive ? Icons.shield_rounded : Icons.directions_walk_rounded,
+                    color: isExceptionActive ? const Color(0xFF8B5CF6) : statusColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Estado de Inmovilidad',
+                    style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
+              // Badge de estado
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isExceptionActive
+                      ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                      : statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isExceptionActive
+                        ? const Color(0xFF8B5CF6).withOpacity(0.4)
+                        : statusColor.withOpacity(0.4),
+                  ),
+                ),
+                child: Text(
+                  isExceptionActive ? 'Pausado' : status,
+                  style: TextStyle(
+                    color: isExceptionActive ? const Color(0xFFA78BFA) : statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '${mobility.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: isExceptionActive ? Colors.white54 : Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Nivel de movilidad',
+                style: TextStyle(color: Colors.white30, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Barra de progreso de movilidad
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: mobility / 100.0,
+              minHeight: 8,
+              color: isExceptionActive ? const Color(0xFF8B5CF6) : statusColor,
+              backgroundColor: Colors.white10,
+            ),
+          ),
+          if (isExceptionActive) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFFA78BFA), size: 14),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Actividad excepcional activa. No se generarán alertas por inmovilidad.',
+                      style: TextStyle(color: Color(0xFFA78BFA), fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _triggerVerificationFlow(BiometricSignalResponse signal) {
+    if (_isVerificationDialogShowing) return;
+    _isVerificationDialogShowing = true;
+    _verificationCountdown = 5;
+
+    _verificationTimer?.cancel();
+    _verificationTimer = null;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            _verificationTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (_verificationCountdown > 1) {
+                setDialogState(() {
+                  _verificationCountdown--;
+                });
+              } else {
+                timer.cancel();
+                _verificationTimer = null;
+                Navigator.of(context).pop();
+                _onVerificationTimeout(signal);
+              }
+            });
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF131929),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    '¿Te encuentras bien?',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Se ha detectado una situación de riesgo. Por favor confirma que estás a salvo.',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: CircularProgressIndicator(
+                          value: _verificationCountdown / 5.0,
+                          strokeWidth: 5,
+                          color: const Color(0xFFEF4444),
+                          backgroundColor: Colors.white10,
+                        ),
+                      ),
+                      Text(
+                        '$_verificationCountdown',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      _verificationTimer?.cancel();
+                      _verificationTimer = null;
+                      Navigator.of(context).pop();
+                      _onVerificationConfirmed();
+                    },
+                    child: const Text(
+                      'ESTOY BIEN',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      _isVerificationDialogShowing = false;
+      _verificationTimer?.cancel();
+      _verificationTimer = null;
+    });
+  }
+
+  void _onVerificationConfirmed() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('estado confirmado correctamente', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    _resetAlertFlags();
+  }
+
+  Future<void> _onVerificationTimeout(BiometricSignalResponse signal) async {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('alerta enviada por falta de respuesta', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    _sendAlertsAndLocation(signal);
+  }
+
+  Future<void> _sendAlertsAndLocation(BiometricSignalResponse signal) async {
+    try {
+      final contacts = await _api.getContacts();
+      
+      if (contacts.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('no existen contactos de emergencia registrados', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      final status = await Permission.location.status;
+      if (!status.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('no se pudo obtener la ubicación', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ubicación compartida correctamente', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('alerta enviada correctamente', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      _handleCriticalAlert(signal);
+
+    } catch (e) {
+      debugPrint('Error enviando alertas: $e');
+    }
+  }
 
   String _formatTime(DateTime dt) =>
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';

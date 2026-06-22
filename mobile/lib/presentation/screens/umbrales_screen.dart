@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../infrastructure/auth/auth_service.dart';
 import '../../domain/entities/user.dart';
+import 'historial_screen.dart';
 
 class UmbralesScreen extends StatefulWidget {
   /// Si se proporciona [patientId], el supervisor ve los umbrales de ese paciente.
@@ -33,17 +34,55 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
   Map<String, dynamic>? _thresholds;
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _error;
+
+  // ── Selector de paciente (sólo supervisor sin patientId fijo) ──────────────
+  List<Map<String, dynamic>> _patients = [];
+  String? _selectedPatientId;
+  String? _selectedPatientEmail;
+  bool _loadingPatients = false;
+
+  bool get _isSupervisorMode =>
+      AuthService().currentUser?.role == Role.supervisor && widget.patientId == null;
+
+  String? get _effectivePatientId => widget.patientId ?? _selectedPatientId;
 
   @override
   void initState() {
     super.initState();
-    _fetchThresholds();
-    
+    if (_isSupervisorMode) {
+      _loadPatients();
+    } else {
+      _fetchThresholds();
+    }
     // Add listeners to auto-calculate Tanaka if user edits biometrics
     _edadCtrl.addListener(_onBiometricsChanged);
     _pesoCtrl.addListener(_onBiometricsChanged);
     _alturaCtrl.addListener(_onBiometricsChanged);
+  }
+
+  Future<void> _loadPatients() async {
+    setState(() => _loadingPatients = true);
+    try {
+      final auth = AuthService();
+      final resp = await http.get(
+        Uri.parse('${auth.baseUrl}/patients'),
+        headers: {'Authorization': 'Bearer ${auth.token}'},
+      );
+      if (resp.statusCode == 200) {
+        final list = (jsonDecode(resp.body) as List).cast<Map<String, dynamic>>();
+        setState(() {
+          _patients = list;
+          _loadingPatients = false;
+          if (list.isNotEmpty) {
+            _selectedPatientId = list.first['id'] as String?;
+            _selectedPatientEmail = list.first['email'] as String?;
+          }
+        });
+        if (_selectedPatientId != null) _fetchThresholds();
+      }
+    } catch (_) {
+      setState(() => _loadingPatients = false);
+    }
   }
 
   @override
@@ -87,10 +126,11 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
   }
 
   Future<void> _fetchThresholds() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() { _isLoading = true; });
+
     try {
       final auth = AuthService();
-      final pid = widget.patientId ?? auth.currentUser?.id;
+      final pid = _effectivePatientId ?? auth.currentUser?.id;
       final url = '${auth.baseUrl}/thresholds/$pid';
       
       final resp = await http.get(
@@ -171,7 +211,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
     setState(() => _isSaving = true);
     try {
       final auth = AuthService();
-      final pid = widget.patientId ?? auth.currentUser?.id;
+      final pid = _effectivePatientId ?? auth.currentUser?.id;
       final url = '${auth.baseUrl}/thresholds/$pid';
 
       final body = <String, dynamic>{
@@ -250,9 +290,17 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
           ],
         ),
       ),
-      body: ListView(
+      body: _loadingPatients
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+          : _isSupervisorMode && _patients.isEmpty
+              ? _buildNoPatients()
+              : (_isSupervisorMode && _isLoading)
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                  : ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
+          // Selector de paciente (supervisor)
+          if (_isSupervisorMode) _buildPatientSelector(),
           // Banner Informativo
           _infoCard('Personalice la biometría y active el modo manual si requiere configurar límites fijos.'),
 
@@ -268,6 +316,7 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
               ],
             ),
           ),
+
 
           const SizedBox(height: 12),
           // IMC / FC Max Info
@@ -378,6 +427,92 @@ class _UmbralesScreenState extends State<UmbralesScreen> {
             ),
           ),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  // ── Selector de paciente ───────────────────────────────────────────────────
+  Widget _buildPatientSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Paciente', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF131929),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedPatientId,
+              dropdownColor: const Color(0xFF131929),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              isExpanded: true,
+              items: _patients.map((p) {
+                return DropdownMenuItem<String>(
+                  value: p['id'] as String,
+                  child: Text(p['email'] as String? ?? p['id'] as String),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val == null) return;
+                final p = _patients.firstWhere((x) => x['id'] == val);
+                setState(() {
+                  _selectedPatientId = val;
+                  _selectedPatientEmail = p['email'] as String?;
+                  _thresholds = null;
+                  _isLoading = true;
+                });
+                _fetchThresholds();
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Botón ver historial del paciente
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF2563EB)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            icon: const Icon(Icons.history_rounded, color: Color(0xFF60A5FA), size: 18),
+            label: Text(
+              'Ver historial de ${_selectedPatientEmail ?? "paciente"}',
+              style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 13),
+            ),
+            onPressed: _selectedPatientId == null ? null : () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HistorialScreen(
+                    patientId: _selectedPatientId,
+                    patientLabel: _selectedPatientEmail,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildNoPatients() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.people_outline_rounded, size: 54, color: Colors.white12),
+          const SizedBox(height: 16),
+          const Text('No tienes pacientes asignados.', style: TextStyle(color: Colors.white54)),
         ],
       ),
     );

@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../infrastructure/api_client/api_client.dart';
 import '../../infrastructure/telemetry/telemetry_service.dart';
+import '../../infrastructure/sensors/simulated_sensor/simulated_sensor_adapter.dart';
 import '../../domain/models/iot_session_model.dart';
 import 'monitor_screen_v2.dart';
 import 'home_shell.dart';
+
 
 class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key});
@@ -181,6 +183,10 @@ class _DeviceScreenState extends State<DeviceScreen>
         _buildPairingCard(),
         const SizedBox(height: 20),
 
+        // ── Simulación de estados del dispositivo ───────────────────────────
+        _buildSimulationPanel(),
+        const SizedBox(height: 20),
+
         // ── Connection Info Card ────────────────────────────────────────────
         _buildConnectionInfoCard(),
         const SizedBox(height: 20),
@@ -192,6 +198,145 @@ class _DeviceScreenState extends State<DeviceScreen>
         // ── Botón Regenerar token ───────────────────────────────────────────
         _buildRegenerateButton(),
       ],
+    );
+  }
+
+  // ── Panel de simulación de estados ────────────────────────────────────────
+  Widget _buildSimulationPanel() {
+    final svc = TelemetryService();
+    final currentScenario = svc.isSimulated ? svc.connectionState : null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131929),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.science_rounded, color: Color(0xFF8B5CF6), size: 20),
+              SizedBox(width: 8),
+              Text('Simular Estado del Dispositivo',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Selecciona un modo para simular cómo reacciona el sistema.',
+            style: TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+          const SizedBox(height: 16),
+          // ── 3 botones de estado ──
+          Row(
+            children: [
+              // ENCENDIDO — normal
+              Expanded(
+                child: _simButton(
+                  label: 'Encendido',
+                  icon: Icons.power_settings_new_rounded,
+                  color: const Color(0xFF10B981),
+                  description: 'Valores normales',
+                  isActive: svc.isSimulated && currentScenario == StreamConnectionState.connected,
+                  onTap: () {
+                    _pollingTimer?.cancel();
+                    svc.setScenario(ScenarioType.normal);
+                    svc.startSimulation();
+                    setState(() {});
+                    _showSnackBar('🟢 Dispositivo ENCENDIDO — simulando datos normales');
+                    homeShellKey.currentState?.switchToTab(0);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              // MAL COLOCADO — moderate
+              Expanded(
+                child: _simButton(
+                  label: 'Mal colocado',
+                  icon: Icons.watch_off_rounded,
+                  color: const Color(0xFFF59E0B),
+                  description: 'SpO₂/BPM anómalos',
+                  isActive: svc.isSimulated && currentScenario == StreamConnectionState.error,
+                  onTap: () {
+                    _pollingTimer?.cancel();
+                    svc.setScenario(ScenarioType.moderate);
+                    svc.startSimulation();
+                    setState(() {});
+                    _showSnackBar('🟡 Dispositivo MAL COLOCADO — señal degradada');
+                    homeShellKey.currentState?.switchToTab(0);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              // APAGADO — desconectar
+              Expanded(
+                child: _simButton(
+                  label: 'Apagado',
+                  icon: Icons.power_off_rounded,
+                  color: const Color(0xFFEF4444),
+                  description: 'Sin transmisión',
+                  isActive: !svc.isSimulated,
+                  onTap: () {
+                    svc.stopSimulation();
+                    svc.disconnect();
+                    setState(() {});
+                    _showSnackBar('🔴 Dispositivo APAGADO — sin señal', isError: true);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _simButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required String description,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.15) : const Color(0xFF0A0E1A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? color : Colors.white12,
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isActive ? color : Colors.white38, size: 24),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isActive ? color : Colors.white54,
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white24, fontSize: 9),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

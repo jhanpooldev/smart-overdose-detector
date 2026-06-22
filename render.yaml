@@ -1,0 +1,30 @@
+services:
+  # 1. Servicio Web para el Backend de FastAPI
+  - type: web
+    name: smart-overdose-detector-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    envVars:
+      - key: ENV
+        value: production
+      - key: STORAGE_BACKEND
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-overdose-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true # Render generará una clave aleatoria y segura automáticamente
+      - key: ALLOWED_ORIGINS
+        value: http://localhost,http://localhost:8080,http://localhost:3000,http://127.0.0.1
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+databases:
+  # 2. Base de Datos PostgreSQL
+  - name: smart-overdose-db
+    plan: free
+    databaseName: overdose_detector
+    user: sod_user
