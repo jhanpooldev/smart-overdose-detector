@@ -15,6 +15,10 @@ load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 class Settings:
     # ── Base de datos ──────────────────────────────────────────────────────────
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    # Normalizar para compatibilidad con SQLAlchemy 2.0+ (evita error Can't load plugin: sqlalchemy.dialects:postgres)
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
     # "memory" = sin BD real | "postgres" = PostgreSQL real
     STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "memory")
 
