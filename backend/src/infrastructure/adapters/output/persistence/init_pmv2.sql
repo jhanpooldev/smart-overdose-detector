@@ -4,7 +4,15 @@
 -- ==============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+
+-- Intentar cargar TimescaleDB de forma segura, ignorando si no está disponible
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'La extensión timescaledb no está disponible en este servidor PostgreSQL.';
+END $$;
+
 
 DO $$ BEGIN
   CREATE TYPE risk_level_enum   AS ENUM ('NORMAL', 'MODERATE', 'CRITICAL');
@@ -65,14 +73,31 @@ CREATE TABLE IF NOT EXISTS biometric_signals (
     PRIMARY KEY ("time", device_id)
 );
 
-SELECT create_hypertable(
-    'biometric_signals',
-    'time',
-    if_not_exists => TRUE,
-    chunk_time_interval => INTERVAL '1 day'
-);
+-- Intentar crear hypertable solo si la extensión TimescaleDB está cargada
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable(
+            'biometric_signals',
+            'time',
+            if_not_exists => TRUE,
+            chunk_time_interval => INTERVAL '1 day'
+        );
+    ELSE
+        RAISE NOTICE 'Saltando create_hypertable porque la extensión timescaledb no está activa.';
+    END IF;
+END $$;
 
-SELECT add_retention_policy('biometric_signals', INTERVAL '90 days', if_not_exists => TRUE);
+-- Intentar agregar política de retención de datos si la extensión está activa
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM add_retention_policy('biometric_signals', INTERVAL '90 days', if_not_exists => TRUE);
+    ELSE
+        RAISE NOTICE 'Saltando add_retention_policy porque la extensión timescaledb no está activa.';
+    END IF;
+END $$;
+
 
 CREATE INDEX IF NOT EXISTS idx_biometric_patient_time
     ON biometric_signals (patient_id, "time" DESC);
