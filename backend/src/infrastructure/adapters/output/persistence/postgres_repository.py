@@ -163,6 +163,10 @@ class ThresholdORM(Base):
 # ──────────────────────────────────────────────
 
 def _make_engine(database_url: str):
+    # SQLAlchemy 2.0 no soporta el dialecto "postgres://", requiere obligatoriamente "postgresql://"
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
     try:
         engine = create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=10)
         logger.info("✅ PostgreSQL conectado: %s", database_url.split("@")[-1])
@@ -174,6 +178,7 @@ def _make_engine(database_url: str):
             f"Verifica DATABASE_URL en el archivo .env\n"
             f"Error: {e}"
         )
+
 
 
 # ──────────────────────────────────────────────
