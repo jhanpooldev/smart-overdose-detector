@@ -1,13 +1,20 @@
 -- ==============================================================
 -- init_pmv2.sql — Schema completo PMV2
--- Motor: PostgreSQL 15 + TimescaleDB
+-- Motor: PostgreSQL 15 + TimescaleDB (Manejo tolerante a fallos)
 -- Aplicar sobre la BD: Overdose-detector
 -- Uso: psql -U postgres -d "Overdose-detector" -f init_pmv2.sql
 -- ==============================================================
 
 -- ── Extensiones ──────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+
+-- Intentar cargar TimescaleDB de forma segura, ignorando si no está disponible
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'La extensión timescaledb no está disponible en este servidor PostgreSQL.';
+END $$;
 
 -- ── ENUMs de dominio ─────────────────────────────────────────
 DO $$ BEGIN
@@ -74,16 +81,30 @@ CREATE TABLE IF NOT EXISTS biometric_signals (
     PRIMARY KEY ("time", device_id)
 );
 
--- Convertir a hypertable particionada por 'time' (TimescaleDB RF04)
-SELECT create_hypertable(
-    'biometric_signals',
-    'time',
-    if_not_exists => TRUE,
-    chunk_time_interval => INTERVAL '1 day'
-);
+-- Intentar crear hypertable solo si la extensión TimescaleDB está cargada
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable(
+            'biometric_signals',
+            'time',
+            if_not_exists => TRUE,
+            chunk_time_interval => INTERVAL '1 day'
+        );
+    ELSE
+        RAISE NOTICE 'Saltando create_hypertable porque la extensión timescaledb no está activa.';
+    END IF;
+END $$;
 
--- Política de retención: 90 días de datos
-SELECT add_retention_policy('biometric_signals', INTERVAL '90 days', if_not_exists => TRUE);
+-- Intentar agregar política de retención de datos si la extensión está activa
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM add_retention_policy('biometric_signals', INTERVAL '90 days', if_not_exists => TRUE);
+    ELSE
+        RAISE NOTICE 'Saltando add_retention_policy porque la extensión timescaledb no está activa.';
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_biometric_patient_time
     ON biometric_signals (patient_id, "time" DESC);
@@ -176,4 +197,3 @@ CREATE TABLE IF NOT EXISTS export_logs (
 );
 
 -- ── FIN ───────────────────────────────────────────────────────
--- Sin datos semilla. Los usuarios se crean desde la app.
