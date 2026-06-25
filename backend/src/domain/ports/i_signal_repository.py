@@ -1,4 +1,4 @@
-from typing import Protocol, List
+from typing import Protocol, List, Any
 from src.domain.entities.biometric_reading import BiometricReading
 
 
@@ -9,4 +9,4 @@ class ISignalRepository(Protocol):
 
     def save(self, patient_id: str, reading: BiometricReading) -> None: ...
 
-    def get_history(self, patient_id: str, limit: int = 50) -> List[BiometricReading]: ...
+    async def get_history(self, patient_id: str, limit: int = 50) -> List[Any]: ...

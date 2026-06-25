@@ -7,8 +7,16 @@ Selecciona automáticamente el repositorio según STORAGE_BACKEND en el .env:
 """
 import logging
 from src.infrastructure.configuration.settings import settings
+from src.domain.ports.i_signal_repository import ISignalRepository
+from src.domain.ports.i_user_repository import IUserRepository
+from src.domain.ports.i_risk_repository import IRiskRepository
 
 logger = logging.getLogger(__name__)
+
+# Anotaciones de tipo para Pyright/Pylance — la instancia real se asigna más abajo
+signal_repository: ISignalRepository
+user_repository: IUserRepository
+risk_repository: IRiskRepository
 
 # ──────────────────────────────────────────────────────────────
 # 1. Selección del backend de persistencia

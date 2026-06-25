@@ -4,7 +4,7 @@ auth_controller.py — Endpoints para login y seguridad.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 from datetime import datetime
 import uuid
@@ -257,16 +257,17 @@ async def update_patient_thresholds(
 
                 session.commit()
     else:
-        if not hasattr(user_repository, "_custom_thresholds"):
-            user_repository._custom_thresholds = {}
+        _repo_any: Any = user_repository  # El repo en memoria tiene _custom_thresholds dinámico
+        if not hasattr(_repo_any, "_custom_thresholds"):
+            _repo_any._custom_thresholds = {}
         
         if req.is_manual is False:
-            if patient_id in user_repository._custom_thresholds:
-                del user_repository._custom_thresholds[patient_id]
+            if patient_id in _repo_any._custom_thresholds:
+                del _repo_any._custom_thresholds[patient_id]
         elif any(x is not None for x in [req.bpm_min_normal, req.bpm_max_normal, req.bpm_min_moderate, req.bpm_max_moderate, req.spo2_min_normal, req.spo2_min_moderate, req.spo2_min_critical]):
             tanaka = _calculate_thresholds(patient)
-            existing = user_repository._custom_thresholds.get(patient_id, {})
-            user_repository._custom_thresholds[patient_id] = {
+            existing = _repo_any._custom_thresholds.get(patient_id, {})
+            _repo_any._custom_thresholds[patient_id] = {
                 "bpm_min_normal": req.bpm_min_normal if req.bpm_min_normal is not None else existing.get("bpm_min_normal", tanaka["bpm"]["normal_min"]),
                 "bpm_max_normal": req.bpm_max_normal if req.bpm_max_normal is not None else existing.get("bpm_max_normal", tanaka["bpm"]["normal_max"]),
                 "bpm_min_moderate": req.bpm_min_moderate if req.bpm_min_moderate is not None else existing.get("bpm_min_moderate", tanaka["bpm"]["moderate_lo"]),

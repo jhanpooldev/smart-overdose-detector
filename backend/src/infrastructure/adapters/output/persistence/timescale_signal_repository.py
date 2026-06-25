@@ -68,7 +68,12 @@ class TimescaleSignalRepository(ISignalRepository):
             session.add(record)
             session.commit()
 
-    def get_history(self, patient_id: str, limit: int = 50) -> List[BiometricReading]:
+    def save(self, patient_id: str, reading: BiometricReading) -> None:
+        """Alias de save_reading con patient_id explícito."""
+        reading.patient_id = patient_id  # type: ignore[attr-defined]
+        self.save_reading(reading)
+
+    async def get_history(self, patient_id: str, limit: int = 50) -> List[BiometricReading]:
         with self._Session() as session:
             rows = (
                 session.query(BiometricSignalORM)

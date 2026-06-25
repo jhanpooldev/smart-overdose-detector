@@ -74,12 +74,12 @@ class IPatientRepository(ABC):
     """
 
     @abstractmethod
-    async def get_by_id(self, patient_id: str) -> Optional[User]:
+    def get_by_id(self, patient_id: str) -> Optional[User]:
         """Obtiene un usuario por su UUID."""
         ...
 
     @abstractmethod
-    async def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> Optional[User]:
         """Obtiene un usuario por email (login)."""
         ...
 

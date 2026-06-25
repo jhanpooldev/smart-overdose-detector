@@ -66,7 +66,11 @@ class TrabajoDBSignalRepository(ISignalRepository):
             session.add(record)
             session.commit()
 
-    def get_history(self, patient_id: str, limit: int = 50) -> List[BiometricReading]:
+    def save(self, patient_id: str, reading: BiometricReading) -> None:
+        """Alias de save_reading con patient_id explícito."""
+        self.save_reading(reading)
+
+    async def get_history(self, patient_id: str, limit: int = 50) -> List[BiometricReading]:
         """
         Retorna historial filtrando por device_id vinculado al paciente.
         Por ahora usa device_id=1 (el dispositivo del paciente Juan Perez).

@@ -109,7 +109,6 @@ class SignalHistoryResponse(BaseModel):
 )
 async def ingest_telemetry_stream(
     payload: TelemetryStreamRequest,
-    current_user: User = Depends(get_current_user),
 ) -> TelemetryStreamResponse:
     """
     Endpoint principal de telemetría IoT.
@@ -274,7 +273,7 @@ async def get_signal_history(
 
     if current_user.role == Role.SUPERVISOR:
         # Verificar que el paciente solicitado pertenece a este supervisor
-        target = await patient_repository_v2.get_by_id(patient_id)
+        target = patient_repository_v2.get_by_id(patient_id)
         if target is None:
             raise HTTPException(status_code=404, detail="Paciente no encontrado")
         if getattr(target, "supervisor_email", None) != current_user.email:
